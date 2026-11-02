@@ -2,3 +2,5 @@ node_modules/
 mechviz-out/
 __pycache__/
 *.pyc
+
+.vercel
