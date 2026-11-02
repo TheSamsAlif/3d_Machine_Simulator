@@ -3,12 +3,11 @@ import * as THREE from 'three';
 // =========================================================================
 // SCORPIO SC-9 · BIONIC OCTOPOD EXOSKELETON & HEAVY ALL-TERRAIN ROVER
 // HIGH-TORQUE MANIPULATOR / FIELD SIMULATOR
-// Exact match to user lab console screenshots & high-fidelity 3D teardown
+// Exact match to user lab console standard & high-fidelity 3D teardown
 // =========================================================================
 
 const app = document.getElementById('app');
 
-// Inject CSS matching the screenshots
 const style = document.createElement('style');
 style.textContent = `
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
@@ -19,7 +18,6 @@ style.textContent = `
     --text-muted: #8c8983;
     --text-faint: #b8b5ae;
     --border-line: #e3dfd7;
-    --border-dark: #2a2825;
     --accent-orange: #ff4800;
     --accent-orange-bg: #fff0eb;
     --accent-green: #0ea569;
@@ -98,7 +96,7 @@ style.textContent = `
   .servo-val { width: 44px; text-align: right; font-weight: 600; color: var(--text-dark); }
   .servo-val.detached { color: var(--accent-orange); font-size: 7.5px; font-weight: 700; }
 
-  /* Right Side Buttons Grid */
+  /* Buttons Grid */
   .btn-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 4px; }
   .pill-btn {
     border: 1px solid var(--border-line);
@@ -121,7 +119,7 @@ style.textContent = `
     border-color: var(--accent-orange);
   }
 
-  /* Attitude / Horizon */
+  /* Attitude Horizon */
   .gimbal-box { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
   .gimbal-circle { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border-line); background: #eeebe3; position: relative; overflow: hidden; }
   .gimbal-horizon { position: absolute; left: -10px; right: -10px; top: 50%; height: 1.5px; background: var(--accent-orange); transform-origin: center; }
@@ -130,7 +128,7 @@ style.textContent = `
   .gimbal-lbl { color: var(--text-muted); }
   .gimbal-val { font-weight: 700; color: var(--text-dark); }
 
-  /* Subsystems List */
+  /* Subsystems */
   .subsys-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dotted var(--border-line); font-family: 'JetBrains Mono', monospace; font-size: 8px; }
   .subsys-item:last-child { border-bottom: none; }
   .subsys-left { display: flex; flex-direction: column; }
@@ -146,7 +144,7 @@ style.textContent = `
   .flight-mode-title { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent-orange); line-height: 1; margin: 3px 0; }
   .flight-mode-sub { font-size: 9px; font-weight: 600; letter-spacing: 1.2px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; }
 
-  /* Bottom Timeline / Log Bar */
+  /* Bottom Bar */
   .bottom-bar { display: flex; align-items: center; gap: 16px; background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 8px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); pointer-events: auto; }
   .play-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-orange); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.1s; }
   .play-btn:active { transform: scale(0.95); }
@@ -156,7 +154,7 @@ style.textContent = `
   .timeline-thumb { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--accent-orange); position: absolute; left: 46%; transform: translateX(-50%); }
   .timeline-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8.5px; color: var(--text-muted); }
 
-  /* 3D Screen Space Callout Labels Canvas */
+  /* 3D Callout Labels */
   #labels-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 15; width: 100%; height: 100%; }
   .dom-label {
     position: absolute;
@@ -184,7 +182,7 @@ style.textContent = `
     margin-top: 1px;
   }
 
-  /* Grid Overlay */
+  /* Grid overlay */
   .grid-bg-overlay {
     position: absolute;
     inset: 0;
@@ -198,7 +196,6 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Build HUD HTML
 app.innerHTML = `
   <div id="canvas-container">
     <canvas id="gl"></canvas>
@@ -221,13 +218,11 @@ app.innerHTML = `
         </div>
       </div>
 
-      <!-- Top Center Telemetry Pill -->
+      <!-- Top Center Specs -->
       <div class="top-center interactive">
         <div class="spec-item">
           <span class="spec-label">HYDRAULIC LOAD</span>
-          <div class="lift-load-bar" id="load-bar">
-            <!-- 20 segments -->
-          </div>
+          <div class="lift-load-bar" id="load-bar"></div>
         </div>
         <div class="spec-item">
           <span class="spec-label">SIM ID</span>
@@ -251,7 +246,7 @@ app.innerHTML = `
       </div>
     </div>
 
-    <!-- Operating Mode Floating Tag (Center Left) -->
+    <!-- Operating Mode Floating Tag -->
     <div class="flight-mode-anchor">
       <div class="flight-mode-tag">OPERATING MODE</div>
       <div class="flight-mode-title" id="mode-title">STRIKE ARMED</div>
@@ -335,15 +330,13 @@ app.innerHTML = `
             <span>LOAD PER LEG · KNEE TORQUE</span>
             <span class="subsys-tag green" id="legs-mode-tag">GAIT LOCK</span>
           </div>
-          <div id="arm-rows">
-            <!-- L1..L4, R1..R4 injected dynamically -->
-          </div>
+          <div id="arm-rows"></div>
         </div>
       </div>
 
       <!-- Right Column -->
       <div class="panel-col-right">
-        <!-- 04 HORIZON & ATTITUDE -->
+        <!-- 04 ATTITUDE -->
         <div class="tech-card">
           <div class="card-header">
             <span class="card-title">ATTITUDE</span>
@@ -459,7 +452,7 @@ app.innerHTML = `
       </div>
     </div>
 
-    <!-- Bottom Bar: Operation Log Timeline -->
+    <!-- Bottom Bar -->
     <div class="bottom-bar">
       <button class="play-btn" id="btn-play">
         <svg viewBox="0 0 24 24" id="play-icon"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
@@ -558,7 +551,7 @@ resize();
 // LIGHTING & SHADOW GROUND
 // =========================================================================
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.15);
 scene.add(ambientLight);
 
 const mainKeyLight = new THREE.DirectionalLight(0xffffff, 2.2);
@@ -574,7 +567,7 @@ fillLight.position.set(-5, 3, -3);
 scene.add(fillLight);
 
 // Floor
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.ShadowMaterial({ opacity: 0.15 }));
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.ShadowMaterial({ opacity: 0.14 }));
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -0.85;
 floor.receiveShadow = true;
@@ -583,6 +576,23 @@ scene.add(floor);
 const gridHelper = new THREE.GridHelper(12, 24, 0xd0ccc3, 0xe5e1d7);
 gridHelper.position.y = -0.84;
 scene.add(gridHelper);
+
+// Orbit Rings
+const orbitRingsGroup = new THREE.Group();
+scene.add(orbitRingsGroup);
+[1.3, 1.9, 2.6].forEach(r => {
+  const circleGeo = new THREE.BufferGeometry();
+  const pts = [];
+  for (let a = 0; a <= 64; a++) {
+    const ang = (a / 64) * Math.PI * 2;
+    pts.push(new THREE.Vector3(Math.cos(ang) * r, 0, Math.sin(ang) * r));
+  }
+  circleGeo.setFromPoints(pts);
+  const ringLine = new THREE.Line(circleGeo, new THREE.LineDashedMaterial({ color: 0xcdcac0, dashSize: 0.08, gapSize: 0.06 }));
+  ringLine.computeLineDistances();
+  ringLine.position.y = 0.15;
+  orbitRingsGroup.add(ringLine);
+});
 
 // =========================================================================
 // MATERIALS
@@ -602,7 +612,7 @@ const orangeMat = new THREE.MeshStandardMaterial({
 
 const darkMechMat = new THREE.MeshStandardMaterial({
   color: 0x18181a,
-  metalness: 0.8,
+  metalness: 0.85,
   roughness: 0.35
 });
 
@@ -611,7 +621,7 @@ const lensMat = new THREE.MeshPhysicalMaterial({
   metalness: 0.9,
   roughness: 0.05,
   transmission: 0.5,
-  reflectivity: 0.9
+  reflectivity: 0.95
 });
 
 // =========================================================================
@@ -647,7 +657,6 @@ for (let c = 0; c < 5; c++) {
   plate.receiveShadow = true;
   carapaceGroup.add(plate);
 
-  // Orange joint accent ring
   const accent = new THREE.Mesh(new THREE.BoxGeometry(0.78 - c * 0.08, 0.02, 0.04), orangeMat);
   accent.position.set(0, 0.14 + c * 0.03, 0.36 - c * 0.22);
   carapaceGroup.add(accent);
@@ -655,7 +664,6 @@ for (let c = 0; c < 5; c++) {
   carapacePlates.push(plate);
 }
 
-// Internal chassis frame
 const chassisMesh = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.2, 0.9), darkMechMat);
 chassisMesh.position.set(0, -0.05, -0.1);
 chassisMesh.castShadow = true;
@@ -690,7 +698,6 @@ for (let s = 0; s < 6; s++) {
   const segPivot = new THREE.Group();
   segPivot.position.set(0, s === 0 ? 0 : 0.22, s === 0 ? 0 : -0.08);
 
-  // Arched segment cylinder
   const segMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(0.12 - s * 0.015, 0.14 - s * 0.015, 0.24, 16),
     whiteMat
@@ -699,7 +706,6 @@ for (let s = 0; s < 6; s++) {
   segMesh.castShadow = true;
   segPivot.add(segMesh);
 
-  // Orange hydraulic actuator joint
   const joint = new THREE.Mesh(new THREE.TorusGeometry(0.13 - s * 0.015, 0.018, 10, 24), orangeMat);
   joint.rotation.x = Math.PI / 2;
   joint.position.y = 0.22;
@@ -710,7 +716,7 @@ for (let s = 0; s < 6; s++) {
   prevTail = segPivot;
 }
 
-// Terminal Stinger Bulb & Titanium Puncture Spur
+// Stinger Bulb & Titanium Spur
 const stingerBulb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 16), whiteMat);
 stingerBulb.position.y = 0.22;
 stingerBulb.castShadow = true;
@@ -721,7 +727,6 @@ stingerCollar.rotation.x = Math.PI / 2;
 stingerCollar.position.y = 0.22;
 prevTail.add(stingerCollar);
 
-// Curved puncture spur needle
 const spurCurve = new THREE.CatmullRomCurve3([
   new THREE.Vector3(0, 0.22, 0),
   new THREE.Vector3(0, 0.35, 0.1),
@@ -736,12 +741,6 @@ spurTip.rotation.x = Math.PI / 3;
 prevTail.add(spurTip);
 
 // --- 4. DUAL CHELAE (HYDRAULIC PINCERS) ---
-const clawL = createChelae(true);
-chelaeLGroup.add(clawL);
-
-const clawR = createChelae(false);
-chelaeRGroup.add(clawR);
-
 let clawFingersL, clawFingersR;
 
 function createChelae(isLeft) {
@@ -749,7 +748,6 @@ function createChelae(isLeft) {
   const side = isLeft ? -1 : 1;
   root.position.set(side * 0.42, 0, 0.32);
 
-  // Arm segment 1 (Humerus)
   const arm1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.38, 16), whiteMat);
   arm1.rotation.z = side * 0.7;
   arm1.rotation.y = side * 0.4;
@@ -757,25 +755,21 @@ function createChelae(isLeft) {
   arm1.castShadow = true;
   root.add(arm1);
 
-  // Arm segment 2 (Brachium)
   const arm2 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.35, 16), whiteMat);
   arm2.rotation.z = -side * 0.5;
   arm2.position.set(side * 0.34, 0.12, 0.38);
   arm2.castShadow = true;
   root.add(arm2);
 
-  // Orange elbow joint
   const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), orangeMat);
   elbow.position.set(side * 0.32, 0.1, 0.26);
   root.add(elbow);
 
-  // Pincer Palm Bulb
   const palm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.28), whiteMat);
   palm.position.set(side * 0.42, 0.14, 0.58);
   palm.castShadow = true;
   root.add(palm);
 
-  // Pincer Opposed Fingers
   const fingerFixed = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.26, 4), darkMechMat);
   fingerFixed.rotation.x = Math.PI / 2;
   fingerFixed.rotation.z = side * 0.2;
@@ -794,7 +788,13 @@ function createChelae(isLeft) {
   return root;
 }
 
-// --- 5. 8 ARTICULATED LEGS (L1..L4, R1..R4) ---
+const clawL = createChelae(true);
+chelaeLGroup.add(clawL);
+
+const clawR = createChelae(false);
+chelaeRGroup.add(clawR);
+
+// --- 5. 8 ARTICULATED WALKING LEGS ---
 const legs = [];
 for (let side = -1; side <= 1; side += 2) {
   const isLeft = side < 0;
@@ -804,12 +804,10 @@ for (let side = -1; side <= 1; side += 2) {
     legRoot.position.set(side * 0.38, -0.05, legZ);
     legsGroup.add(legRoot);
 
-    // Coxa joint
     const coxa = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.15, 12), orangeMat);
     coxa.rotation.z = Math.PI / 2;
     legRoot.add(coxa);
 
-    // Femur
     const femurGroup = new THREE.Group();
     femurGroup.position.set(side * 0.08, 0, 0);
     legRoot.add(femurGroup);
@@ -820,12 +818,10 @@ for (let side = -1; side <= 1; side += 2) {
     femur.castShadow = true;
     femurGroup.add(femur);
 
-    // Knee joint
     const knee = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), darkMechMat);
     knee.position.set(side * 0.34, 0.18, 0);
     femurGroup.add(knee);
 
-    // Tibia
     const tibiaGroup = new THREE.Group();
     tibiaGroup.position.copy(knee.position);
     femurGroup.add(tibiaGroup);
@@ -836,7 +832,6 @@ for (let side = -1; side <= 1; side += 2) {
     tibia.castShadow = true;
     tibiaGroup.add(tibia);
 
-    // Foot pad
     const foot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), orangeMat);
     foot.position.set(side * 0.22, -0.45, 0);
     tibiaGroup.add(foot);
@@ -1114,6 +1109,8 @@ function animate() {
   const targetExploded = isExploded ? 1.0 : 0.0;
   explodedFactor += (targetExploded - explodedFactor) * 0.08;
 
+  orbitRingsGroup.visible = (explodedFactor > 0.05);
+
   // --- 1. CARAPACE PLATES DISPLACEMENT ---
   carapacePlates.forEach((plate, idx) => {
     plate.position.y = (0.06 + idx * 0.03) + (explodedFactor * (0.2 + idx * 0.12));
@@ -1122,8 +1119,8 @@ function animate() {
   // --- 2. STINGER TAIL ARCH & STRIKE DYNAMICS ---
   let strikeAngle = 0;
   if (strikeTriggered) {
-    strikeTimer += delta * 4;
-    strikeAngle = Math.sin(strikeTimer * Math.PI) * 0.45;
+    strikeTimer += delta * 5;
+    strikeAngle = Math.sin(strikeTimer * Math.PI) * 0.55;
     if (strikeTimer >= 1.0) strikeTriggered = false;
   }
 
@@ -1151,9 +1148,9 @@ function animate() {
     const lift = Math.max(0, wave);
     
     if (isPlaying) {
-      leg.femur.rotation.z = leg.side * (0.65 + wave * 0.1);
-      leg.femur.position.y = lift * 0.06;
-      leg.tibia.rotation.z = -leg.side * (0.45 + wave * 0.08);
+      leg.femur.rotation.z = leg.side * (0.65 + wave * 0.12);
+      leg.femur.position.y = lift * 0.08;
+      leg.tibia.rotation.z = -leg.side * (0.45 + wave * 0.09);
     }
 
     leg.root.position.x = leg.side * (0.38 + explodedFactor * 0.35);
