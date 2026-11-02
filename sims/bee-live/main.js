@@ -2,9 +2,11 @@ import * as THREE from 'three';
 
 // =========================================================================
 // MELLIS HB-7 · ROBOTIC POLLINATOR MICRO AIR VEHICLE
-// FIELD SIMULATOR & PRECISION 3D TEARDOWN
-// Exact 1:1 recreation of reference engineering lab console (Images 1 & 2)
+// 1600x900 FIXED-VIRTUAL RESPONSIVE CONSOLE & 3D SIMULATOR
 // =========================================================================
+
+const W = 1600;
+const H = 900;
 
 const app = document.getElementById('app');
 
@@ -22,23 +24,33 @@ style.textContent = `
     --accent-orange-bg: #fff0eb;
     --accent-green: #0ea569;
     --accent-green-bg: #e6f7ef;
-    --panel-bg: rgba(255, 255, 255, 0.94);
+    --panel-bg: rgba(255, 255, 255, 0.95);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-lab); font-family: 'Inter', sans-serif; color: var(--text-dark); user-select: none; }
   
-  #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; }
-  #gl { width: 100%; height: 100%; display: block; cursor: grab; }
+  #app {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: ${W}px;
+    height: ${H}px;
+    transform-origin: 0 0;
+    overflow: hidden;
+  }
+
+  #canvas-container { position: absolute; inset: 0; width: ${W}px; height: ${H}px; }
+  #gl { width: ${W}px; height: ${H}px; display: block; cursor: grab; }
   #gl.grabbing { cursor: grabbing; }
-  #labels-canvas { position: absolute; inset: 0; pointer-events: none; width: 100%; height: 100%; z-index: 10; }
+  #labels-canvas { position: absolute; inset: 0; pointer-events: none; width: ${W}px; height: ${H}px; z-index: 10; }
 
   /* UI Layer */
-  #hud-layer { position: absolute; inset: 0; pointer-events: none; z-index: 20; padding: 18px 24px; display: flex; flex-direction: column; justify-content: space-between; }
+  #hud-layer { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
   .interactive { pointer-events: auto; }
 
   /* Top Bar */
-  .top-bar { display: flex; justify-content: space-between; align-items: flex-start; }
+  .top-bar { position: absolute; top: 20px; left: 28px; right: 28px; display: flex; justify-content: space-between; align-items: flex-start; }
   .brand-group { display: flex; align-items: stretch; gap: 14px; }
   .logo-box { background: var(--accent-orange); color: #fff; border-radius: 4px; padding: 6px 12px; display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
   .logo-box svg { width: 20px; height: 20px; fill: currentColor; }
@@ -60,54 +72,53 @@ style.textContent = `
   .status-badge.orange { color: var(--accent-orange); background: var(--accent-orange-bg); }
   .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-  /* Panels Layout */
-  .panels-wrapper { position: absolute; inset: 0; pointer-events: none; }
-  .panel-col-left { position: absolute; left: 24px; top: 96px; width: 220px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
-  .panel-col-right { position: absolute; right: 24px; top: 96px; width: 220px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
+  /* Left & Right Fixed Columns */
+  .panel-col-left { position: absolute; left: 28px; top: 92px; width: 230px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+  .panel-col-right { position: absolute; right: 28px; top: 92px; width: 230px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
 
-  .tech-card { background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 12px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
-  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .card-title { font-size: 9px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-dark); display: flex; align-items: center; gap: 6px; }
-  .card-title::before { content: ''; display: inline-block; width: 3px; height: 10px; background: var(--accent-orange); }
-  .card-idx { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; color: var(--text-faint); }
+  .tech-card { background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 11px 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .card-title { font-size: 8.5px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-dark); display: flex; align-items: center; gap: 6px; }
+  .card-title::before { content: ''; display: inline-block; width: 3px; height: 9px; background: var(--accent-orange); }
+  .card-idx { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 600; color: var(--text-faint); }
 
-  /* Big Metric Numbers */
-  .metric-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-  .metric-big { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 800; letter-spacing: -1px; color: var(--text-dark); line-height: 1; }
-  .metric-unit { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
-  .metric-sub { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-dark); }
+  /* Metric Numbers */
+  .metric-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .metric-big { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 800; letter-spacing: -1px; color: var(--text-dark); line-height: 1; }
+  .metric-unit { font-size: 10px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+  .metric-sub { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: var(--text-dark); }
 
-  /* Sine Wave Canvas */
-  .wave-canvas { width: 100%; height: 42px; border-bottom: 1px solid var(--border-line); margin-bottom: 6px; display: block; }
-  .wave-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); }
+  /* Canvas wave */
+  .wave-canvas { width: 100%; height: 38px; border-bottom: 1px solid var(--border-line); margin-bottom: 4px; display: block; }
+  .wave-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 7.5px; color: var(--text-muted); }
 
   /* Battery Gauge */
-  .power-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-line); font-family: 'JetBrains Mono', monospace; }
+  .power-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; padding-top: 5px; border-top: 1px solid var(--border-line); font-family: 'JetBrains Mono', monospace; }
   .power-sub { font-size: 7.5px; color: var(--text-muted); text-transform: uppercase; }
-  .power-val { font-size: 10px; font-weight: 700; color: var(--text-dark); }
-  .battery-bars { display: flex; gap: 2px; height: 12px; margin-top: 4px; }
+  .power-val { font-size: 9.5px; font-weight: 700; color: var(--text-dark); }
+  .battery-bars { display: flex; gap: 2px; height: 10px; margin-top: 3px; }
   .battery-seg { flex: 1; border-radius: 1px; background: #e5e2da; }
   .battery-seg.fill-red { background: var(--accent-orange); }
   .battery-seg.fill-green { background: var(--accent-green); }
 
   /* Leg Servos Rows */
-  .servo-row { display: flex; align-items: center; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9px; margin-bottom: 4px; }
-  .servo-name { width: 22px; font-weight: 700; color: var(--text-dark); }
-  .servo-track { flex: 1; height: 4px; background: #e8e4dc; border-radius: 2px; margin: 0 8px; overflow: hidden; }
+  .servo-row { display: flex; align-items: center; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8.5px; margin-bottom: 3.5px; }
+  .servo-name { width: 20px; font-weight: 700; color: var(--text-dark); }
+  .servo-track { flex: 1; height: 4px; background: #e8e4dc; border-radius: 2px; margin: 0 6px; overflow: hidden; }
   .servo-fill { height: 100%; background: var(--accent-orange); transition: width 0.3s ease; }
-  .servo-val { width: 44px; text-align: right; font-weight: 600; color: var(--text-dark); }
+  .servo-val { width: 40px; text-align: right; font-weight: 600; color: var(--text-dark); }
   .servo-val.detached { color: var(--accent-orange); font-size: 7.5px; font-weight: 700; }
 
   /* Buttons Grid */
-  .btn-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 4px; }
+  .btn-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 3px; }
   .pill-btn {
     border: 1px solid var(--border-line);
     background: #fff;
     color: var(--text-dark);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8.5px;
+    font-size: 8px;
     font-weight: 700;
-    padding: 6px 4px;
+    padding: 5px 3px;
     border-radius: 4px;
     cursor: pointer;
     text-align: center;
@@ -115,68 +126,64 @@ style.textContent = `
     text-transform: uppercase;
   }
   .pill-btn:hover { border-color: var(--text-dark); }
-  .pill-btn.active {
-    background: var(--accent-orange);
-    color: #fff;
-    border-color: var(--accent-orange);
-  }
+  .pill-btn.active { background: var(--accent-orange); color: #fff; border-color: var(--accent-orange); }
 
-  /* Attitude Indicator */
-  .horizon-wrapper { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
-  .horizon-circle {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: #edeae2;
-    border: 1px solid var(--border-line);
-    position: relative;
-    overflow: hidden;
-  }
+  /* Attitude Horizon */
+  .horizon-wrapper { display: flex; align-items: center; gap: 10px; margin-top: 3px; }
+  .horizon-circle { width: 56px; height: 56px; border-radius: 50%; background: #edeae2; border: 1px solid var(--border-line); position: relative; overflow: hidden; }
   .horizon-sky { position: absolute; inset: 0; background: #f0ece3; }
   .horizon-line { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: var(--accent-orange); transform-origin: center; }
-  .horizon-stats { display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace; font-size: 9px; }
-  .h-stat { display: flex; justify-content: space-between; gap: 10px; }
-  .h-lbl { color: var(--text-muted); font-size: 8px; }
+  .horizon-stats { display: flex; flex-direction: column; gap: 2px; font-family: 'JetBrains Mono', monospace; font-size: 8.5px; }
+  .h-stat { display: flex; justify-content: space-between; gap: 8px; }
+  .h-lbl { color: var(--text-muted); font-size: 7.5px; }
   .h-num { font-weight: 700; color: var(--text-dark); }
 
   /* Subsystems List */
-  .subsys-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0ede6; }
+  .subsys-item { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; border-bottom: 1px solid #f2efe8; }
   .subsys-item:last-child { border-bottom: none; }
   .subsys-left { display: flex; flex-direction: column; gap: 1px; }
-  .subsys-name { font-size: 8.5px; font-weight: 700; color: var(--text-dark); font-family: 'JetBrains Mono', monospace; }
-  .subsys-desc { font-size: 7.5px; color: var(--text-muted); }
-  .subsys-tag { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 1px 6px; border-radius: 2px; }
+  .subsys-name { font-size: 8px; font-weight: 700; color: var(--text-dark); font-family: 'JetBrains Mono', monospace; }
+  .subsys-desc { font-size: 7px; color: var(--text-muted); }
+  .subsys-tag { font-family: 'JetBrains Mono', monospace; font-size: 7.5px; font-weight: 700; padding: 1px 5px; border-radius: 2px; }
   .subsys-tag.green { background: var(--accent-green-bg); color: var(--accent-green); }
   .subsys-tag.orange { background: var(--accent-orange-bg); color: var(--accent-orange); }
 
   /* Center Bottom Status Overlay */
-  .flight-mode-tag {
-    position: absolute;
-    left: 270px;
-    bottom: 96px;
-    display: flex;
-    flex-direction: column;
-    pointer-events: none;
-  }
-  .flight-mode-sub { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+  .flight-mode-tag { position: absolute; left: 280px; bottom: 84px; display: flex; flex-direction: column; pointer-events: none; }
+  .flight-mode-sub { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
   .flight-mode-big { font-size: 26px; font-weight: 800; color: var(--accent-orange); letter-spacing: -0.5px; line-height: 1.1; }
-  .flight-mode-spec { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; color: var(--text-muted); text-transform: uppercase; margin-top: 3px; letter-spacing: 0.5px; }
+  .flight-mode-spec { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; letter-spacing: 0.5px; }
 
-  /* Bottom Timeline Bar */
-  .bottom-bar { background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 8px 18px; display: flex; align-items: center; gap: 18px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
-  .play-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--accent-orange); border: none; cursor: pointer; display: grid; place-items: center; color: #fff; flex-shrink: 0; box-shadow: 0 2px 6px rgba(255, 72, 0, 0.3); }
-  .play-btn svg { width: 14px; height: 14px; fill: currentColor; }
+  /* Bottom Timeline Bar - PINNED AT BOTTOM */
+  .bottom-bar {
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    bottom: 20px;
+    height: 48px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-line);
+    border-radius: 6px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    pointer-events: auto;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  }
+  .play-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-orange); border: none; cursor: pointer; display: grid; place-items: center; color: #fff; flex-shrink: 0; box-shadow: 0 2px 6px rgba(255, 72, 0, 0.3); }
+  .play-btn svg { width: 13px; height: 13px; fill: currentColor; }
   .timeline-track { flex: 1; height: 5px; background: #e5e1d7; border-radius: 2px; position: relative; cursor: pointer; }
   .timeline-progress { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-orange); border-radius: 2px; width: 85%; }
-  .timeline-thumb { position: absolute; left: 85%; top: 50%; width: 12px; height: 12px; background: #fff; border: 2.5px solid var(--accent-orange); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
-  .timeline-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); }
+  .timeline-thumb { position: absolute; left: 85%; top: 50%; width: 11px; height: 11px; background: #fff; border: 2.5px solid var(--accent-orange); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+  .timeline-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 7.5px; color: var(--text-muted); }
 
   /* Screen Space Callout Labels */
   .dom-label {
     position: absolute;
     pointer-events: none;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 9px;
+    font-size: 8.5px;
     font-weight: 700;
     color: var(--text-dark);
     letter-spacing: 0.8px;
@@ -184,13 +191,13 @@ style.textContent = `
     opacity: 0;
     transition: opacity 0.25s ease;
     transform: translate(12px, -50%);
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.9);
     padding: 2px 6px;
     border-radius: 3px;
     border-left: 2px solid var(--accent-orange);
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
-  .dom-label .sub { display: block; font-size: 7.5px; font-weight: 500; color: var(--text-muted); }
+  .dom-label .sub { display: block; font-size: 7px; font-weight: 500; color: var(--text-muted); }
 `;
 document.head.appendChild(style);
 
@@ -261,209 +268,202 @@ app.innerHTML = `
       <span class="flight-mode-spec" id="mode-desc">STATION KEEPING · 144 MM AGL</span>
     </div>
 
-    <!-- Left & Right Telemetry Panels -->
-    <div class="panels-wrapper">
-      <!-- Left Column -->
-      <div class="panel-col-left">
-        <!-- 01 WING BEAT -->
-        <div class="tech-card">
-          <div class="card-header">
-            <span class="card-title">WING BEAT</span>
-            <span class="card-idx">01</span>
+    <!-- Left Column -->
+    <div class="panel-col-left">
+      <!-- 01 WING BEAT -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">WING BEAT</span>
+          <span class="card-idx">01</span>
+        </div>
+        <div class="metric-row">
+          <div>
+            <span class="metric-big" id="val-freq">7.5</span>
+            <span class="metric-unit">HZ</span>
+            <div style="font-size:7px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">STROKE FREQUENCY</div>
           </div>
-          <div class="metric-row">
-            <div>
-              <span class="metric-big" id="val-freq">7.5</span>
-              <span class="metric-unit">HZ</span>
-              <div style="font-size:7.5px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">STROKE FREQUENCY</div>
-            </div>
-            <div style="text-align:right;">
-              <span class="metric-sub" id="val-amp">±32°</span>
-              <div style="font-size:7.5px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">AMPLITUDE</div>
-            </div>
-          </div>
-          <canvas class="wave-canvas" id="wing-canvas" width="190" height="42"></canvas>
-          <div class="wave-meta">
-            <span>-1.2 S</span>
-            <span>PLAYBACK 1.0x</span>
-            <span>SHUTTER 1/60</span>
-            <span>NOW</span>
+          <div style="text-align:right;">
+            <span class="metric-sub" id="val-amp">±32°</span>
+            <div style="font-size:7px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">AMPLITUDE</div>
           </div>
         </div>
-
-        <!-- 02 POWER -->
-        <div class="tech-card">
-          <div class="card-header">
-            <span class="card-title">POWER</span>
-            <span class="card-idx">02</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <span class="metric-big">80</span>
-              <span class="metric-unit">%</span>
-              <div style="font-size:7.5px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">BATTERY</div>
-            </div>
-            <div class="battery-bars" style="width:110px;">
-              <div class="battery-seg fill-red"></div>
-              <div class="battery-seg fill-red"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg"></div>
-              <div class="battery-seg"></div>
-            </div>
-          </div>
-          <div class="power-stats">
-            <div>
-              <div class="power-sub">DRAW</div>
-              <div class="power-val" id="val-draw">34.0 W</div>
-            </div>
-            <div>
-              <div class="power-sub">CELL</div>
-              <div class="power-val">3.70 V</div>
-            </div>
-            <div>
-              <div class="power-sub">MOTOR</div>
-              <div class="power-val">41 °C</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 03 LEG SERVOS -->
-        <div class="tech-card">
-          <div class="card-header">
-            <span class="card-title">LEG SERVOS</span>
-            <span class="card-idx">03</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; font-size:7.5px; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:6px; text-transform:uppercase;">
-            <span>LOAD PER LEG</span>
-            <span>KNEE TORQUE</span>
-            <span style="color:var(--accent-green); font-weight:700;">PASSIVE</span>
-          </div>
-          <div id="arm-rows"></div>
+        <canvas class="wave-canvas" id="wing-canvas" width="200" height="38"></canvas>
+        <div class="wave-meta">
+          <span>-1.2 S</span>
+          <span>PLAYBACK 1.0x</span>
+          <span>SHUTTER 1/60</span>
+          <span>NOW</span>
         </div>
       </div>
 
-      <!-- Right Column -->
-      <div class="panel-col-right">
-        <!-- 04 FLIGHT -->
-        <div class="tech-card">
-          <div class="card-header">
-            <span class="card-title">FLIGHT</span>
-            <span class="card-idx">04</span>
+      <!-- 02 POWER -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">POWER</span>
+          <span class="card-idx">02</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <span class="metric-big">80</span>
+            <span class="metric-unit">%</span>
+            <div style="font-size:7px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">BATTERY</div>
           </div>
-          <div class="horizon-wrapper">
-            <div class="horizon-circle">
-              <div class="horizon-sky"></div>
-              <div class="horizon-line" id="horizon-line"></div>
-            </div>
-            <div class="horizon-stats">
-              <div class="h-stat"><span class="h-lbl">ALT AGL</span><span class="h-num" id="val-alt">144.0 MM</span></div>
-              <div class="h-stat"><span class="h-lbl">V/S</span><span class="h-num">+0.6 MM/S</span></div>
-              <div class="h-stat"><span class="h-lbl">PITCH</span><span class="h-num">+0.03°</span></div>
-              <div class="h-stat"><span class="h-lbl">ROLL</span><span class="h-num">-0.57°</span></div>
-            </div>
-          </div>
-          <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:6px; border-top:1px solid var(--border-line); font-family:'JetBrains Mono'; font-size:8px; color:var(--text-muted); text-transform:uppercase;">
-            <span>HOLD <strong>POSITION</strong></span>
-            <span>AIRSPEED <strong>0.00 M/S</strong></span>
+          <div class="battery-bars" style="width:110px;">
+            <div class="battery-seg fill-red"></div>
+            <div class="battery-seg fill-red"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg"></div>
+            <div class="battery-seg"></div>
           </div>
         </div>
-
-        <!-- 05 ASSEMBLIES -->
-        <div class="tech-card">
-          <div class="card-header">
-            <span class="card-title">ASSEMBLIES</span>
-            <span class="card-idx">05</span>
+        <div class="power-stats">
+          <div>
+            <div class="power-sub">DRAW</div>
+            <div class="power-val" id="val-draw">34.0 W</div>
           </div>
-          <div class="btn-grid-3">
-            <button class="pill-btn active" data-assembly="hero">HERO</button>
-            <button class="pill-btn" data-assembly="optics">OPTICS</button>
-            <button class="pill-btn" data-assembly="wing">WING</button>
-            <button class="pill-btn" data-assembly="leg">LEG L2</button>
-            <button class="pill-btn" data-assembly="thorax">THORAX</button>
-            <button class="pill-btn" data-assembly="abdomen">ABDOMEN</button>
+          <div>
+            <div class="power-sub">CELL</div>
+            <div class="power-val">3.70 V</div>
+          </div>
+          <div>
+            <div class="power-sub">MOTOR</div>
+            <div class="power-val">41 °C</div>
           </div>
         </div>
+      </div>
 
-        <!-- 06 DISPLAY -->
-        <div class="tech-card">
-          <div class="card-header">
-            <span class="card-title">DISPLAY</span>
-            <span class="card-idx">06</span>
+      <!-- 03 LEG SERVOS -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">LEG SERVOS</span>
+          <span class="card-idx">03</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:5px; text-transform:uppercase;">
+          <span>LOAD PER LEG</span>
+          <span>KNEE TORQUE</span>
+          <span style="color:var(--accent-green); font-weight:700;">PASSIVE</span>
+        </div>
+        <div id="arm-rows"></div>
+      </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="panel-col-right">
+      <!-- 04 FLIGHT -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">FLIGHT</span>
+          <span class="card-idx">04</span>
+        </div>
+        <div class="horizon-wrapper">
+          <div class="horizon-circle">
+            <div class="horizon-sky"></div>
+            <div class="horizon-line" id="horizon-line"></div>
           </div>
-          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px;">
-            <button class="pill-btn active" id="btn-labels">LABELS</button>
-            <button class="pill-btn" id="btn-exploded">EXPLODED</button>
-            <button class="pill-btn active" id="btn-motion">MOTION BLUR</button>
-          </div>
-          <div style="margin-top:4px;">
-            <button class="pill-btn" id="btn-turntable" style="width:100%;">TURNTABLE</button>
+          <div class="horizon-stats">
+            <div class="h-stat"><span class="h-lbl">ALT AGL</span><span class="h-num" id="val-alt">144.0 MM</span></div>
+            <div class="h-stat"><span class="h-lbl">V/S</span><span class="h-num">+0.6 MM/S</span></div>
+            <div class="h-stat"><span class="h-lbl">PITCH</span><span class="h-num">+0.03°</span></div>
+            <div class="h-stat"><span class="h-lbl">ROLL</span><span class="h-num">-0.57°</span></div>
           </div>
         </div>
+      </div>
 
-        <!-- 07 SUBSYSTEMS -->
-        <div class="tech-card">
-          <div class="card-header">
-            <span class="card-title">SUBSYSTEMS</span>
-            <span class="card-idx">07</span>
+      <!-- 05 ASSEMBLIES -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">ASSEMBLIES</span>
+          <span class="card-idx">05</span>
+        </div>
+        <div class="btn-grid-3">
+          <button class="pill-btn active" data-assembly="hero">HERO</button>
+          <button class="pill-btn" data-assembly="optics">OPTICS</button>
+          <button class="pill-btn" data-assembly="wing">WING</button>
+          <button class="pill-btn" data-assembly="leg">LEG L2</button>
+          <button class="pill-btn" data-assembly="thorax">THORAX</button>
+          <button class="pill-btn" data-assembly="abdomen">ABDOMEN</button>
+        </div>
+      </div>
+
+      <!-- 06 DISPLAY -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">DISPLAY</span>
+          <span class="card-idx">06</span>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px;">
+          <button class="pill-btn active" id="btn-labels">LABELS</button>
+          <button class="pill-btn" id="btn-exploded">EXPLODED</button>
+          <button class="pill-btn active" id="btn-motion">MOTION BLUR</button>
+        </div>
+        <div style="margin-top:4px;">
+          <button class="pill-btn" id="btn-turntable" style="width:100%;">TURNTABLE</button>
+        </div>
+      </div>
+
+      <!-- 07 SUBSYSTEMS -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">SUBSYSTEMS</span>
+          <span class="card-idx">07</span>
+        </div>
+        <div class="subsys-item">
+          <div class="subsys-left">
+            <span class="subsys-name">01 OPTIC HEAD</span>
+            <span class="subsys-desc">2 x 18 MM LENS · AMBER IR</span>
           </div>
-          <div class="subsys-item">
-            <div class="subsys-left">
-              <span class="subsys-name">01 OPTIC HEAD</span>
-              <span class="subsys-desc">2 x 18 MM LENS · AMBER IR</span>
-            </div>
-            <span class="subsys-tag green" id="sub-01">TRACKING</span>
+          <span class="subsys-tag green" id="sub-01">TRACKING</span>
+        </div>
+        <div class="subsys-item">
+          <div class="subsys-left">
+            <span class="subsys-name">02 NECK BEARING</span>
+            <span class="subsys-desc">10-SEGMENT COLLAR</span>
           </div>
-          <div class="subsys-item">
-            <div class="subsys-left">
-              <span class="subsys-name">02 NECK BEARING</span>
-              <span class="subsys-desc">10-SEGMENT COLLAR</span>
-            </div>
-            <span class="subsys-tag green" id="sub-02">LOCKED</span>
+          <span class="subsys-tag green" id="sub-02">LOCKED</span>
+        </div>
+        <div class="subsys-item">
+          <div class="subsys-left">
+            <span class="subsys-name">03 THORAX DRIVE</span>
+            <span class="subsys-desc">3 GEARS · 11 ACTUATORS</span>
           </div>
-          <div class="subsys-item">
-            <div class="subsys-left">
-              <span class="subsys-name">03 THORAX DRIVE</span>
-              <span class="subsys-desc">3 GEARS · 11 ACTUATORS</span>
-            </div>
-            <span class="subsys-tag green" id="sub-03">ENGAGED</span>
+          <span class="subsys-tag green" id="sub-03">ENGAGED</span>
+        </div>
+        <div class="subsys-item">
+          <div class="subsys-left">
+            <span class="subsys-name">04 WING ROOTS</span>
+            <span class="subsys-desc">4 HINGES · 7.5 HZ CRANK</span>
           </div>
-          <div class="subsys-item">
-            <div class="subsys-left">
-              <span class="subsys-name">04 WING ROOTS</span>
-              <span class="subsys-desc">4 HINGES · 7.5 HZ CRANK</span>
-            </div>
-            <span class="subsys-tag green" id="sub-04">7.5 HZ</span>
+          <span class="subsys-tag green" id="sub-04">7.5 HZ</span>
+        </div>
+        <div class="subsys-item">
+          <div class="subsys-left">
+            <span class="subsys-name">05 LEG SERVOS</span>
+            <span class="subsys-desc">6 LEGS · 3 JOINTS</span>
           </div>
-          <div class="subsys-item">
-            <div class="subsys-left">
-              <span class="subsys-name">05 LEG SERVOS</span>
-              <span class="subsys-desc">6 LEGS · 3 JOINTS</span>
-            </div>
-            <span class="subsys-tag green" id="sub-05">ACTIVE</span>
+          <span class="subsys-tag green" id="sub-05">ACTIVE</span>
+        </div>
+        <div class="subsys-item">
+          <div class="subsys-left">
+            <span class="subsys-name">06 ABDOMEN CAPSULE</span>
+            <span class="subsys-desc">GEAR TRAIN · RETURN SPRING</span>
           </div>
-          <div class="subsys-item">
-            <div class="subsys-left">
-              <span class="subsys-name">06 ABDOMEN CAPSULE</span>
-              <span class="subsys-desc">GEAR TRAIN · RETURN SPRING</span>
-            </div>
-            <span class="subsys-tag green" id="sub-06">SEALED</span>
-          </div>
+          <span class="subsys-tag green" id="sub-06">SEALED</span>
         </div>
       </div>
     </div>
 
-    <!-- Bottom Bar -->
+    <!-- Bottom Bar (Strictly pinned at bottom 20px) -->
     <div class="bottom-bar">
       <button class="play-btn" id="btn-play">
         <svg viewBox="0 0 24 24" id="play-icon"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
       </button>
       <div style="flex:1;">
-        <div style="display:flex; justify-content:space-between; font-size:7.5px; font-weight:700; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:4px; text-transform:uppercase;">
+        <div style="display:flex; justify-content:space-between; font-size:7px; font-weight:700; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:3px; text-transform:uppercase;">
           <span style="color:var(--text-dark); display:flex; align-items:center; gap:4px;"><span style="color:var(--accent-orange);">|</span> FLIGHT LOG</span>
           <span>TAKE-OFF</span>
           <span style="color:var(--accent-orange); font-weight:700;" id="timeline-operator-text">OPERATOR · HERO · RELEASE</span>
@@ -474,7 +474,7 @@ app.innerHTML = `
           <div class="timeline-progress" id="timeline-progress"></div>
           <div class="timeline-thumb" id="timeline-thumb"></div>
         </div>
-        <div class="timeline-meta" style="margin-top:4px;">
+        <div class="timeline-meta" style="margin-top:3px;">
           <span id="timeline-time">00:21 / 00:24</span>
           <span>8 OPERATOR ACTIONS</span>
         </div>
@@ -482,6 +482,16 @@ app.innerHTML = `
     </div>
   </div>
 `;
+
+// Responsive Scaling Engine (Identical to V8 & Cessna architecture)
+function fitViewport() {
+  const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+  const left = (window.innerWidth - W * scale) / 2;
+  const top = (window.innerHeight - H * scale) / 2;
+  app.style.transform = `translate(${left}px, ${top}px) scale(${scale})`;
+}
+window.addEventListener('resize', fitViewport);
+fitViewport();
 
 // Populate load bar
 const loadBar = document.getElementById('load-bar');
@@ -524,57 +534,40 @@ const canvas = document.getElementById('gl');
 const labelsCanvas = document.getElementById('labels-canvas');
 const labelsCtx = labelsCanvas.getContext('2d');
 
+canvas.width = W;
+canvas.height = H;
+labelsCanvas.width = W;
+labelsCanvas.height = H;
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf6f4f0);
 
-const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 100);
 camera.position.set(3.4, 1.8, 3.8);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(W, H);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 
-function resize() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-  renderer.setSize(w, h);
-  labelsCanvas.width = w;
-  labelsCanvas.height = h;
-}
-window.addEventListener('resize', resize);
-resize();
-
-// Lighting
+// Studio Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 1.25);
 scene.add(ambientLight);
 
-const mainKeyLight = new THREE.DirectionalLight(0xfffbf5, 2.4);
+const mainKeyLight = new THREE.DirectionalLight(0xfffbf5, 2.5);
 mainKeyLight.position.set(5, 8, 5);
 mainKeyLight.castShadow = true;
 mainKeyLight.shadow.mapSize.width = 2048;
 mainKeyLight.shadow.mapSize.height = 2048;
-mainKeyLight.shadow.camera.near = 0.5;
-mainKeyLight.shadow.camera.far = 25;
-mainKeyLight.shadow.camera.left = -4;
-mainKeyLight.shadow.camera.right = 4;
-mainKeyLight.shadow.camera.top = 4;
-mainKeyLight.shadow.camera.bottom = -4;
 mainKeyLight.shadow.bias = -0.0001;
 scene.add(mainKeyLight);
 
-const fillLight = new THREE.DirectionalLight(0xedf4ff, 0.8);
+const fillLight = new THREE.DirectionalLight(0xedf4ff, 0.85);
 fillLight.position.set(-6, 3, -4);
 scene.add(fillLight);
-
-const rimLight = new THREE.DirectionalLight(0xffecd2, 1.1);
-rimLight.position.set(2, -4, -5);
-scene.add(rimLight);
 
 // Studio Floor Shadow Receiver
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(32, 32), new THREE.ShadowMaterial({ opacity: 0.16 }));
@@ -607,71 +600,17 @@ scene.add(orbitRingsGroup);
   orbitRingsGroup.add(ringLine);
 });
 
-// =========================================================================
-// PREMIUM STUDIO MATERIALS
-// =========================================================================
+// Materials
+const whiteShellMat = new THREE.MeshStandardMaterial({ color: 0xfaf8f5, metalness: 0.08, roughness: 0.22 });
+const orangeMat = new THREE.MeshStandardMaterial({ color: 0xff4800, metalness: 0.42, roughness: 0.26 });
+const darkMechMat = new THREE.MeshStandardMaterial({ color: 0x18181b, metalness: 0.88, roughness: 0.35 });
+const chromeMat = new THREE.MeshStandardMaterial({ color: 0xe6e4e0, metalness: 0.95, roughness: 0.12 });
+const copperMat = new THREE.MeshStandardMaterial({ color: 0xc86a36, metalness: 0.82, roughness: 0.3 });
+const lensMat = new THREE.MeshPhysicalMaterial({ color: 0x050b16, metalness: 0.92, roughness: 0.04, transmission: 0.65, reflectivity: 0.95, clearcoat: 1.0 });
+const wingMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transmission: 0.9, opacity: 0.86, transparent: true, roughness: 0.12, thickness: 0.04, clearcoat: 1.0, side: THREE.DoubleSide });
+const motionBlurMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, side: THREE.DoubleSide });
 
-const whiteShellMat = new THREE.MeshStandardMaterial({
-  color: 0xfaf8f5,
-  metalness: 0.08,
-  roughness: 0.22
-});
-
-const orangeMat = new THREE.MeshStandardMaterial({
-  color: 0xff4800,
-  metalness: 0.42,
-  roughness: 0.26
-});
-
-const darkMechMat = new THREE.MeshStandardMaterial({
-  color: 0x18181b,
-  metalness: 0.88,
-  roughness: 0.35
-});
-
-const chromeMat = new THREE.MeshStandardMaterial({
-  color: 0xe6e4e0,
-  metalness: 0.95,
-  roughness: 0.12
-});
-
-const copperMat = new THREE.MeshStandardMaterial({
-  color: 0xc86a36,
-  metalness: 0.82,
-  roughness: 0.3
-});
-
-const lensMat = new THREE.MeshPhysicalMaterial({
-  color: 0x050b16,
-  metalness: 0.92,
-  roughness: 0.04,
-  transmission: 0.65,
-  reflectivity: 0.95,
-  clearcoat: 1.0
-});
-
-const wingMat = new THREE.MeshPhysicalMaterial({
-  color: 0xffffff,
-  transmission: 0.9,
-  opacity: 0.86,
-  transparent: true,
-  roughness: 0.12,
-  thickness: 0.04,
-  clearcoat: 1.0,
-  side: THREE.DoubleSide
-});
-
-const motionBlurMat = new THREE.MeshBasicMaterial({
-  color: 0xffffff,
-  transparent: true,
-  opacity: 0.22,
-  side: THREE.DoubleSide
-});
-
-// =========================================================================
-// 3D MODEL HIERARCHY: MELLIS HB-7
-// =========================================================================
-
+// 3D Model Hierarchy
 const beeRoot = new THREE.Group();
 scene.add(beeRoot);
 
@@ -684,31 +623,15 @@ const wingsGroup = new THREE.Group();
 const legsGroup = new THREE.Group();
 const hardwareGroup = new THREE.Group();
 
-beeRoot.add(headGroup);
-beeRoot.add(neckGroup);
-beeRoot.add(thoraxGroup);
-beeRoot.add(gearCoreGroup);
-beeRoot.add(abdomenGroup);
-beeRoot.add(wingsGroup);
-beeRoot.add(legsGroup);
-beeRoot.add(hardwareGroup);
+beeRoot.add(headGroup, neckGroup, thoraxGroup, gearCoreGroup, abdomenGroup, wingsGroup, legsGroup, hardwareGroup);
 
-// --- 1. HEAD & OPTIC ASSEMBLY ---
+// --- 1. HEAD & OPTICS ---
 headGroup.position.set(0, 0.18, 0.68);
-
-// Faceted Robotic Head Shell
 const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.38, 36, 28), whiteShellMat);
 headMesh.scale.set(0.96, 0.92, 1.15);
 headMesh.castShadow = true;
-headMesh.receiveShadow = true;
 headGroup.add(headMesh);
 
-// Center visor seam plate
-const headSeam = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.012, 8, 32), darkMechMat);
-headSeam.rotation.y = Math.PI / 2;
-headGroup.add(headSeam);
-
-// Primary Optic Camera Snout (Protruding front snout matching Image 1)
 const snoutGroup = new THREE.Group();
 snoutGroup.position.set(0, 0.02, 0.38);
 headGroup.add(snoutGroup);
@@ -721,11 +644,6 @@ const snoutOrangeRim = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.032, 16, 3
 snoutOrangeRim.position.z = 0.05;
 snoutGroup.add(snoutOrangeRim);
 
-const snoutLensBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.06, 32), chromeMat);
-snoutLensBarrel.rotation.x = Math.PI / 2;
-snoutLensBarrel.position.z = 0.07;
-snoutGroup.add(snoutLensBarrel);
-
 const eyeLens = new THREE.Mesh(new THREE.SphereGeometry(0.165, 24, 20, 0, Math.PI * 2, 0, Math.PI * 0.5), lensMat);
 eyeLens.rotation.x = -Math.PI / 2;
 eyeLens.position.z = 0.09;
@@ -735,67 +653,34 @@ const irDot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 16), orangeMat);
 irDot.position.z = 0.11;
 snoutGroup.add(irDot);
 
-// Lateral Optic Pods (Left & Right)
+// Lateral Optics
 function createSideOptic(side) {
-  const sideOptic = new THREE.Group();
-  sideOptic.position.set(side * 0.32, 0.04, 0.15);
-  sideOptic.rotation.set(0, side * 0.7, 0);
-
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.05, 20), darkMechMat);
-  base.rotation.x = Math.PI / 2;
-  sideOptic.add(base);
-
+  const g = new THREE.Group();
+  g.position.set(side * 0.32, 0.04, 0.15);
+  g.rotation.set(0, side * 0.7, 0);
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.016, 12, 24), orangeMat);
   ring.position.z = 0.03;
-  sideOptic.add(ring);
-
+  g.add(ring);
   const lens = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), lensMat);
   lens.rotation.x = -Math.PI / 2;
   lens.position.z = 0.035;
-  sideOptic.add(lens);
-
-  return sideOptic;
+  g.add(lens);
+  return g;
 }
-headGroup.add(createSideOptic(-1));
-headGroup.add(createSideOptic(1));
+headGroup.add(createSideOptic(-1), createSideOptic(1));
 
-// Robotic Mouthparts / Mandibles
-const mandibleL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.08), darkMechMat);
-mandibleL.position.set(-0.1, -0.26, 0.32);
-mandibleL.rotation.set(0.4, 0, -0.2);
-headGroup.add(mandibleL);
-
-const mandibleR = mandibleL.clone();
-mandibleR.position.x = 0.1;
-mandibleR.rotation.z = 0.2;
-headGroup.add(mandibleR);
-
-// Articulated Twin Antennae
+// Antennae
 function createAntenna(side) {
   const ant = new THREE.Group();
   ant.position.set(side * 0.14, 0.32, 0.18);
   ant.rotation.set(-0.25, side * 0.12, side * 0.28);
-
-  const baseBall = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 12), orangeMat);
-  ant.add(baseBall);
-
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.62, 12), darkMechMat);
   stem.position.y = 0.31;
   stem.castShadow = true;
   ant.add(stem);
-
-  const midJoint = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.05, 12), chromeMat);
-  midJoint.position.y = 0.35;
-  ant.add(midJoint);
-
   const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.026, 0.16, 16), orangeMat);
   tip.position.y = 0.65;
   ant.add(tip);
-
-  const tipLens = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 12), darkMechMat);
-  tipLens.position.y = 0.74;
-  ant.add(tipLens);
-
   return ant;
 }
 const antL = createAntenna(-1);
@@ -804,13 +689,8 @@ headGroup.add(antL, antR);
 
 // --- 2. 10-SEGMENT NECK COLLAR BEARING ---
 neckGroup.position.set(0, 0.15, 0.4);
-
 const collarOuter = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.032, 16, 36), orangeMat);
 neckGroup.add(collarOuter);
-
-const collarInner = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.08, 32, 1, true), darkMechMat);
-collarInner.rotation.x = Math.PI / 2;
-neckGroup.add(collarInner);
 
 const neckBeads = [];
 for (let b = 0; b < 10; b++) {
@@ -821,10 +701,8 @@ for (let b = 0; b < 10; b++) {
   neckBeads.push(bead);
 }
 
-// --- 3. THORAX & EXPOSED DENSE MECHANICAL DRIVE TRAIN ---
+// --- 3. THORAX & INNER DRIVE GEAR TRAIN ---
 thoraxGroup.position.set(0, 0.12, 0);
-
-// Top & Bottom Ceramic Carapace Halves
 const thoraxTop = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 0.72, 32, 1, false, 0, Math.PI), whiteShellMat);
 thoraxTop.rotation.set(0, 0, Math.PI / 2);
 thoraxTop.rotation.y = Math.PI / 2;
@@ -834,19 +712,12 @@ thoraxGroup.add(thoraxTop);
 const tRibbon1 = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.018, 12, 36), orangeMat);
 tRibbon1.position.z = -0.22;
 thoraxGroup.add(tRibbon1);
-
 const tRibbon2 = tRibbon1.clone();
 tRibbon2.position.z = 0.22;
 thoraxGroup.add(tRibbon2);
 
-// Dense Inner Drive Machinery (3 gears + 11 actuators + copper coils)
+// Functional Gears
 gearCoreGroup.position.set(0, 0.12, 0);
-
-const mainShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.8, 16), chromeMat);
-mainShaft.rotation.x = Math.PI / 2;
-gearCoreGroup.add(mainShaft);
-
-// 3 Functional Drive Gears with Tooth Profiles
 const gears = [];
 [
   { z: -0.16, r: 0.28, teeth: 24, mat: darkMechMat },
@@ -855,41 +726,15 @@ const gears = [];
 ].forEach((g, idx) => {
   const gearPivot = new THREE.Group();
   gearPivot.position.z = g.z;
-  
   const rim = new THREE.Mesh(new THREE.CylinderGeometry(g.r, g.r, 0.05, g.teeth), g.mat);
   rim.rotation.x = Math.PI / 2;
   rim.castShadow = true;
   gearPivot.add(rim);
-
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.07, 16), chromeMat);
-  hub.rotation.x = Math.PI / 2;
-  gearPivot.add(hub);
-
   gearCoreGroup.add(gearPivot);
   gears.push({ group: gearPivot, dir: idx % 2 === 0 ? 1 : -1, speed: 2.5 + idx * 0.8 });
 });
 
-// 11 Linear Actuator Cylinders & Hydraulic Rods
-for (let a = 0; a < 11; a++) {
-  const act = new THREE.Group();
-  const ang = (a / 11) * Math.PI * 2;
-  const rad = 0.26;
-  act.position.set(Math.cos(ang) * rad, Math.sin(ang) * rad, (Math.random() - 0.5) * 0.35);
-
-  const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.18, 10), darkMechMat);
-  sleeve.rotation.z = ang + Math.PI / 2;
-  act.add(sleeve);
-
-  const piston = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.12, 10), chromeMat);
-  piston.position.set(Math.cos(ang) * 0.06, Math.sin(ang) * 0.06, 0);
-  piston.rotation.z = sleeve.rotation.z;
-  act.add(piston);
-
-  gearCoreGroup.add(act);
-}
-
-// Tangled black & orange wiring conduits and copper motor coils
-for (let w = 0; w < 18; w++) {
+for (let w = 0; w < 16; w++) {
   const curve = new THREE.CatmullRomCurve3([
     new THREE.Vector3((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.2, -0.25),
     new THREE.Vector3((Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.35, 0),
@@ -899,53 +744,31 @@ for (let w = 0; w < 18; w++) {
   gearCoreGroup.add(tube);
 }
 
-// --- 4. ABDOMEN CAPSULE (TELESCOPING SEGMENTS & RETURN SPRING) ---
+// --- 4. ABDOMEN CAPSULE ---
 abdomenGroup.position.set(0, 0.08, -0.72);
-
 const abdSegments = [];
-const numAbdSegs = 4;
-for (let s = 0; s < numAbdSegs; s++) {
+for (let s = 0; s < 4; s++) {
   const segGroup = new THREE.Group();
   segGroup.position.z = -s * 0.22;
-  
   const rad = 0.42 * Math.pow(0.88, s);
   const shell = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.88, rad, 0.24, 28), whiteShellMat);
   shell.rotation.x = Math.PI / 2;
   shell.castShadow = true;
   segGroup.add(shell);
-
   const ring = new THREE.Mesh(new THREE.TorusGeometry(rad, 0.016, 10, 28), orangeMat);
   ring.position.z = 0.11;
   segGroup.add(ring);
-
   abdomenGroup.add(segGroup);
   abdSegments.push(segGroup);
 }
 
-// Internal Helical Return Spring in Abdomen Core
-const springPts = [];
-for (let t = 0; t <= 120; t++) {
-  const p = t / 120;
-  const ang = p * Math.PI * 14;
-  springPts.push(new THREE.Vector3(Math.cos(ang) * 0.12, Math.sin(ang) * 0.12, -p * 0.7));
-}
-const springGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(springPts), 90, 0.014, 6, false);
-const springMesh = new THREE.Mesh(springGeo, darkMechMat);
-abdomenGroup.add(springMesh);
-
-// Tapered Stinger Nozzle Tip
 const stingerTip = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.36, 20), darkMechMat);
 stingerTip.rotation.x = -Math.PI / 2;
 stingerTip.position.z = -0.92;
 abdomenGroup.add(stingerTip);
 
-const stingerGlow = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 10), orangeMat);
-stingerGlow.position.z = -1.1;
-abdomenGroup.add(stingerGlow);
-
-// --- 5. 4 WINGS (2 FOREWINGS, 2 HINDWINGS) WITH BIONIC VEINS ---
+// --- 5. 4 WINGS & MOTION BLUR FANS ---
 wingsGroup.position.set(0, 0.42, 0.05);
-
 const wingLRoot = new THREE.Group();
 wingLRoot.position.set(-0.36, 0, 0);
 wingsGroup.add(wingLRoot);
@@ -959,29 +782,15 @@ function createVeinedWing(isLeft, isForewing) {
   const dir = isLeft ? -1 : 1;
   const scale = isForewing ? 1.0 : 0.72;
 
-  // Wing Quick Release Hinge (Orange Block)
   const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.12, 16), orangeMat);
   hinge.rotation.z = Math.PI / 2;
   wing.add(hinge);
 
-  const hingePin = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 12), chromeMat);
-  hingePin.rotation.z = Math.PI / 2;
-  wing.add(hingePin);
-
-  // Carbon Leading Edge Spar
-  const sparGeo = new THREE.CylinderGeometry(0.018 * scale, 0.008 * scale, 2.1 * scale, 12);
-  const spar = new THREE.Mesh(sparGeo, darkMechMat);
+  const spar = new THREE.Mesh(new THREE.CylinderGeometry(0.018 * scale, 0.008 * scale, 2.1 * scale, 12), darkMechMat);
   spar.position.set(dir * 1.05 * scale, 0, 0.38 * scale);
   spar.rotation.z = -dir * 0.42;
   wing.add(spar);
 
-  // Orange spar tip
-  const sparTip = new THREE.Mesh(new THREE.ConeGeometry(0.02 * scale, 0.12 * scale, 12), orangeMat);
-  sparTip.position.set(dir * 2.05 * scale, 0, 0.76 * scale);
-  sparTip.rotation.z = -dir * 0.42;
-  wing.add(sparTip);
-
-  // Iridescent Membrane Shape
   const shape = new THREE.Shape();
   shape.moveTo(0, 0);
   shape.bezierCurveTo(dir * 0.6 * scale, 0.2 * scale, dir * 1.4 * scale, 0.7 * scale, dir * 2.1 * scale, 0.82 * scale);
@@ -993,12 +802,10 @@ function createVeinedWing(isLeft, isForewing) {
   membrane.castShadow = true;
   wing.add(membrane);
 
-  // 3D Hexagonal / Bionic Vein Network
   const veinLines = [
     [new THREE.Vector3(0, 0, 0), new THREE.Vector3(dir * 0.9 * scale, 0, 0.38 * scale), new THREE.Vector3(dir * 2.0 * scale, 0, 0.8 * scale)],
     [new THREE.Vector3(dir * 0.5 * scale, 0, 0.2 * scale), new THREE.Vector3(dir * 0.7 * scale, 0, 0.05 * scale)],
-    [new THREE.Vector3(dir * 1.0 * scale, 0, 0.42 * scale), new THREE.Vector3(dir * 1.3 * scale, 0, 0.18 * scale), new THREE.Vector3(dir * 1.2 * scale, 0, 0.02 * scale)],
-    [new THREE.Vector3(dir * 1.5 * scale, 0, 0.62 * scale), new THREE.Vector3(dir * 1.7 * scale, 0, 0.35 * scale)]
+    [new THREE.Vector3(dir * 1.0 * scale, 0, 0.42 * scale), new THREE.Vector3(dir * 1.3 * scale, 0, 0.18 * scale)]
   ];
   veinLines.forEach(pts => {
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
@@ -1012,18 +819,13 @@ function createVeinedWing(isLeft, isForewing) {
 const forewingL = createVeinedWing(true, true);
 const hindwingL = createVeinedWing(true, false);
 hindwingL.position.set(-0.06, -0.04, -0.16);
-hindwingL.rotation.y = -0.18;
-wingLRoot.add(forewingL);
-wingLRoot.add(hindwingL);
+wingLRoot.add(forewingL, hindwingL);
 
 const forewingR = createVeinedWing(false, true);
 const hindwingR = createVeinedWing(false, false);
 hindwingR.position.set(0.06, -0.04, -0.16);
-hindwingR.rotation.y = 0.18;
-wingRRoot.add(forewingR);
-wingRRoot.add(hindwingR);
+wingRRoot.add(forewingR, hindwingR);
 
-// Motion Blur Fan Geometry (as seen in Image 1 Hover Mode!)
 function createMotionBlurFan(isLeft) {
   const dir = isLeft ? -1 : 1;
   const fanGeo = new THREE.RingGeometry(0.25, 2.15, 32, 1, isLeft ? Math.PI * 0.78 : -Math.PI * 0.28, Math.PI * 0.5);
@@ -1037,8 +839,7 @@ const blurFanR = createMotionBlurFan(false);
 wingLRoot.add(blurFanL);
 wingRRoot.add(blurFanR);
 
-// --- 6. 6 ARTICULATED ROBOTIC LEGS (TRIPOD STANCE MATCHING IMAGE 1) ---
-// Each leg features coxa servo, white boxed femur, orange knee hub, tibia strut, ankle ball, and 3-claw foot pad
+// --- 6. 6 ARTICULATED ROBOTIC LEGS (TRIPOD STANCE) ---
 const legs = [];
 const legSpecs = [
   { id: 'L1', side: -1, z: 0.28, angY: 0.45, kneeLen: 0.58, tibLen: 0.72 },
@@ -1055,16 +856,10 @@ legSpecs.forEach(spec => {
   legRoot.rotation.y = spec.angY;
   legsGroup.add(legRoot);
 
-  // Hip Coxa Servo
   const hipServo = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.09, 16), orangeMat);
   hipServo.rotation.x = Math.PI / 2;
   legRoot.add(hipServo);
 
-  const hipCap = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.1, 16), darkMechMat);
-  hipCap.rotation.x = Math.PI / 2;
-  legRoot.add(hipCap);
-
-  // Femur Upper Arm (angles upward-outward)
   const femurGroup = new THREE.Group();
   femurGroup.rotation.z = -spec.side * 0.75;
   legRoot.add(femurGroup);
@@ -1074,24 +869,11 @@ legSpecs.forEach(spec => {
   femurBox.castShadow = true;
   femurGroup.add(femurBox);
 
-  // Weight reduction oval cutout in femur
-  const cutout = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.08, 12), darkMechMat);
-  cutout.rotation.x = Math.PI / 2;
-  cutout.position.y = spec.kneeLen / 2;
-  femurGroup.add(cutout);
-
-  // Knee Rotary Hinge Hub
   const kneeHub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 20), orangeMat);
   kneeHub.position.y = spec.kneeLen;
   kneeHub.rotation.x = Math.PI / 2;
   femurGroup.add(kneeHub);
 
-  const kneeAxle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.09, 12), darkMechMat);
-  kneeAxle.position.copy(kneeHub.position);
-  kneeAxle.rotation.copy(kneeHub.rotation);
-  femurGroup.add(kneeAxle);
-
-  // Tibia Lower Leg (angles down towards floor)
   const tibiaGroup = new THREE.Group();
   tibiaGroup.position.set(0, spec.kneeLen, 0);
   tibiaGroup.rotation.z = spec.side * 1.55;
@@ -1102,45 +884,24 @@ legSpecs.forEach(spec => {
   tibiaStrut.castShadow = true;
   tibiaGroup.add(tibiaStrut);
 
-  // Hydraulic Micro-damper rod
-  const damper = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, spec.tibLen * 0.7, 8), chromeMat);
-  damper.position.set(spec.side * 0.02, spec.tibLen / 2, 0);
-  tibiaGroup.add(damper);
-
-  // Ankle Joint & Foot Pad
-  const ankleBall = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 12), orangeMat);
-  ankleBall.position.y = spec.tibLen;
-  tibiaGroup.add(ankleBall);
-
   const footPad = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.03, 12), darkMechMat);
   footPad.position.y = spec.tibLen + 0.02;
   tibiaGroup.add(footPad);
 
-  legs.push({
-    id: spec.id,
-    root: legRoot,
-    femur: femurGroup,
-    tibia: tibiaGroup,
-    side: spec.side,
-    ankleBall
-  });
+  legs.push({ id: spec.id, root: legRoot, side: spec.side });
 });
 
-// Floating fasteners, nuts, and washers for exploded view (Image 2)
+// Floating fasteners for exploded view
 for (let h = 0; h < 24; h++) {
   const fastener = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.04, 8), chromeMat);
   const ang = (h / 24) * Math.PI * 2;
   const dist = 1.1 + Math.random() * 0.8;
   fastener.position.set(Math.cos(ang) * dist, (Math.random() - 0.5) * 0.8 + 0.3, Math.sin(ang) * dist);
-  fastener.rotation.set(Math.random() * 3, Math.random() * 3, 0);
   hardwareGroup.add(fastener);
 }
 hardwareGroup.visible = false;
 
-// =========================================================================
-// CALLOUT LABELS & LEADER LINES (Exact Match to Image 2)
-// =========================================================================
-
+// Callout Labels
 const calloutDefs = [
   { id: 'wing_hinge', text: 'WING HINGE', sub: 'QUICK RELEASE', getPos: () => forewingR.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.15, 0.1, 0)) },
   { id: 'optic_head', text: 'OPTIC HEAD', sub: '2 x 18 MM LENS · AMBER IR', getPos: () => snoutGroup.getWorldPosition(new THREE.Vector3()) },
@@ -1159,10 +920,7 @@ calloutDefs.forEach(def => {
   domLabels.push({ def, el });
 });
 
-// =========================================================================
-// INTERACTIVE CONTROLS & CAMERA SYSTEM
-// =========================================================================
-
+// Controls & Camera
 let currentAssembly = 'hero';
 let showLabels = true;
 let isExploded = false;
@@ -1207,7 +965,6 @@ canvas.addEventListener('wheel', (e) => {
   spherical.radius = Math.max(1.8, Math.min(8.5, spherical.radius + e.deltaY * 0.004));
 }, { passive: false });
 
-// Assembly Selector Buttons
 const assemblyBtns = document.querySelectorAll('[data-assembly]');
 assemblyBtns.forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1276,22 +1033,17 @@ function setAssemblyMode(mode) {
   }
 }
 
-// Display Buttons
-const btnLabels = document.getElementById('btn-labels');
-btnLabels.addEventListener('click', () => {
+document.getElementById('btn-labels').addEventListener('click', function() {
   showLabels = !showLabels;
-  btnLabels.classList.toggle('active', showLabels);
+  this.classList.toggle('active', showLabels);
 });
 
-const btnExploded = document.getElementById('btn-exploded');
-btnExploded.addEventListener('click', () => {
+document.getElementById('btn-exploded').addEventListener('click', function() {
   isExploded = !isExploded;
-  btnExploded.classList.toggle('active', isExploded);
-  const titleEl = document.getElementById('mode-title');
-  const descEl = document.getElementById('mode-desc');
+  this.classList.toggle('active', isExploded);
   if (isExploded) {
-    titleEl.textContent = 'TEARDOWN';
-    descEl.textContent = 'TURNTABLE 104° · 100% APART';
+    document.getElementById('mode-title').textContent = 'TEARDOWN';
+    document.getElementById('mode-desc').textContent = 'TURNTABLE 104° · 100% APART';
     document.getElementById('val-status-text').textContent = 'TEARDOWN';
     document.getElementById('val-status').className = 'status-badge orange';
     document.getElementById('timeline-operator-text').textContent = 'OPERATOR · EXPLODED ON';
@@ -1300,22 +1052,19 @@ btnExploded.addEventListener('click', () => {
   }
 });
 
-const btnTurntable = document.getElementById('btn-turntable');
-btnTurntable.addEventListener('click', () => {
+document.getElementById('btn-turntable').addEventListener('click', function() {
   isTurntable = !isTurntable;
-  btnTurntable.classList.toggle('active', isTurntable);
+  this.classList.toggle('active', isTurntable);
 });
 
-const btnMotion = document.getElementById('btn-motion');
-btnMotion.addEventListener('click', () => {
+document.getElementById('btn-motion').addEventListener('click', function() {
   showMotionBlur = !showMotionBlur;
-  btnMotion.classList.toggle('active', showMotionBlur);
+  this.classList.toggle('active', showMotionBlur);
   blurFanL.visible = showMotionBlur;
   blurFanR.visible = showMotionBlur;
 });
 
-const btnPlay = document.getElementById('btn-play');
-btnPlay.addEventListener('click', () => {
+document.getElementById('btn-play').addEventListener('click', function() {
   isPlaying = !isPlaying;
   document.getElementById('play-icon').innerHTML = isPlaying ?
     '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>' :
@@ -1327,7 +1076,7 @@ const wingCanvas = document.getElementById('wing-canvas');
 const wingCtx = wingCanvas.getContext('2d');
 let waveOffset = 0;
 
-function drawWingWave(time) {
+function drawWingWave() {
   wingCtx.clearRect(0, 0, wingCanvas.width, wingCanvas.height);
   wingCtx.strokeStyle = '#e8e5de';
   wingCtx.lineWidth = 1;
@@ -1343,7 +1092,7 @@ function drawWingWave(time) {
   const w = wingCanvas.width;
   const h = wingCanvas.height;
   const mid = h / 2;
-  const amp = isPlaying ? 14 : 2;
+  const amp = isPlaying ? 13 : 2;
 
   for (let x = 0; x < w; x++) {
     const progress = x / w;
@@ -1355,10 +1104,7 @@ function drawWingWave(time) {
   wingCtx.stroke();
 }
 
-// =========================================================================
-// MAIN ANIMATION LOOP & KINEMATICS
-// =========================================================================
-
+// Animation loop
 let clock = new THREE.Clock();
 let elapsedSimTime = 21;
 
@@ -1369,28 +1115,22 @@ function animate() {
   const time = clock.getElapsedTime();
 
   if (isPlaying) {
-    waveOffset += delta * 7.5 * Math.PI * 2; // 7.5 Hz stroke frequency
+    waveOffset += delta * 7.5 * Math.PI * 2;
     elapsedSimTime += delta;
-    if (isTurntable) {
-      spherical.theta += delta * 0.35;
-    }
+    if (isTurntable) spherical.theta += delta * 0.35;
   }
 
-  // Camera lerping
   const targetCamPos = new THREE.Vector3().setFromSpherical(spherical).add(camLookAt);
   camera.position.lerp(targetCamPos, 0.08);
   currentLookAt.lerp(camLookAt, 0.08);
   camera.lookAt(currentLookAt);
 
-  // Exploded teardown interpolation
   const targetExploded = isExploded ? 1.0 : 0.0;
   explodedFactor += (targetExploded - explodedFactor) * 0.08;
 
-  // 1. TEARDOWN EXPLODED COMPONENT DISPLACEMENTS (Matching Image 2)
+  // Teardown displacements
   headGroup.position.set(0, 0.18 + explodedFactor * 0.45, 0.68 + explodedFactor * 0.85);
   neckGroup.position.set(0, 0.15 + explodedFactor * 0.25, 0.4 + explodedFactor * 0.45);
-  
-  // Neck bearing beads expand outwards radially
   neckBeads.forEach((bead, i) => {
     const ang = (i / 10) * Math.PI * 2;
     const r = 0.34 + explodedFactor * 0.55;
@@ -1399,26 +1139,19 @@ function animate() {
 
   thoraxTop.position.y = explodedFactor * 0.35;
   gearCoreGroup.position.set(0, 0.12 + explodedFactor * 0.25, 0);
-
-  // Spin inner gears
   gears.forEach(g => {
-    if (isPlaying) {
-      g.group.rotation.z += delta * g.dir * g.speed;
-    }
+    if (isPlaying) g.group.rotation.z += delta * g.dir * g.speed;
   });
 
-  // Abdomen segments telescope backward
   abdomenGroup.position.set(0, 0.08 - explodedFactor * 0.2, -0.72 - explodedFactor * 0.95);
   abdSegments.forEach((seg, s) => {
     seg.position.z = -s * (0.22 + explodedFactor * 0.25);
   });
 
-  // Wings separate laterally
   wingsGroup.position.y = 0.42 + explodedFactor * 0.5;
   wingLRoot.position.x = -0.36 - explodedFactor * 0.65;
   wingRRoot.position.x = 0.36 + explodedFactor * 0.65;
 
-  // Legs explode radially
   legs.forEach(leg => {
     leg.root.position.x = leg.side * (0.36 + explodedFactor * 0.5);
     leg.root.position.y = -0.05 - explodedFactor * 0.3;
@@ -1427,26 +1160,21 @@ function animate() {
   hardwareGroup.visible = (explodedFactor > 0.05);
   orbitRingsGroup.visible = (explodedFactor > 0.05);
 
-  // 2. HOVERING & HIGH-SPEED WING FLAPPING
   if (!isExploded) {
-    // Body hover micro-dynamics
     const hoverY = Math.sin(time * 3.5) * 0.035;
     const hoverPitch = Math.cos(time * 2.2) * 0.02;
     const hoverRoll = Math.sin(time * 2.8) * 0.02;
     beeRoot.position.y = hoverY;
     beeRoot.rotation.set(hoverPitch, 0, hoverRoll);
 
-    // 7.5 Hz wing stroke amplitude ±32° plus chord pitch
     const strokeAngle = Math.sin(waveOffset) * (32 * Math.PI / 180);
     const featherAngle = Math.cos(waveOffset) * 0.22;
-
     wingLRoot.rotation.set(featherAngle, strokeAngle, 0);
     wingRRoot.rotation.set(featherAngle, -strokeAngle, 0);
 
     blurFanL.visible = showMotionBlur;
     blurFanR.visible = showMotionBlur;
 
-    // Antenna subtle sensory twitching
     antL.rotation.z = -0.28 + Math.sin(time * 6) * 0.04;
     antR.rotation.z = 0.28 + Math.cos(time * 6) * 0.04;
   } else {
@@ -1458,49 +1186,42 @@ function animate() {
     blurFanR.visible = false;
   }
 
-  // 3. UI & HUD UPDATES
   renderScreenLabels();
-  drawWingWave(time);
+  drawWingWave();
   updateTelemetryUI(time);
 
   renderer.render(scene, camera);
 }
 
 function renderScreenLabels() {
-  labelsCtx.clearRect(0, 0, labelsCanvas.width, labelsCanvas.height);
+  labelsCtx.clearRect(0, 0, W, H);
   if (!showLabels) {
     domLabels.forEach(item => { item.el.style.opacity = '0'; });
     return;
   }
 
-  const w = labelsCanvas.width;
-  const h = labelsCanvas.height;
-
   domLabels.forEach(({ def, el }) => {
     const pos3D = def.getPos();
     const p = pos3D.clone().project(camera);
 
-    // Behind camera check
     if (p.z > 1.0) {
       el.style.opacity = '0';
       return;
     }
 
-    const sx = (p.x * 0.5 + 0.5) * w;
-    const sy = (-p.y * 0.5 + 0.5) * h;
+    const sx = (p.x * 0.5 + 0.5) * W;
+    const sy = (-p.y * 0.5 + 0.5) * H;
 
     el.style.left = `${sx}px`;
     el.style.top = `${sy}px`;
     el.style.opacity = '1';
 
-    // Draw precision leader line with orange point
     labelsCtx.strokeStyle = 'rgba(255, 72, 0, 0.4)';
     labelsCtx.lineWidth = 1.2;
     labelsCtx.beginPath();
     labelsCtx.arc(sx, sy, 3, 0, Math.PI * 2);
     labelsCtx.fillStyle = '#ff4800';
     labelsCtx.fill();
-
     labelsCtx.moveTo(sx, sy);
     labelsCtx.lineTo(sx + 10, sy);
     labelsCtx.stroke();
@@ -1508,22 +1229,17 @@ function renderScreenLabels() {
 }
 
 function updateTelemetryUI(time) {
-  // Update runtime clock
   const totalSec = Math.floor(elapsedSimTime);
   const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
   const s = String(totalSec % 60).padStart(2, '0');
   document.getElementById('val-runtime').textContent = `00:${m}:${s}`;
   document.getElementById('timeline-time').textContent = `00:${s} / 00:24`;
 
-  // Attitude indicator roll/pitch
   const rollDeg = (Math.sin(time * 2.8) * 0.57).toFixed(2);
   const pitchDeg = (Math.cos(time * 2.2) * 0.03).toFixed(2);
   const hLine = document.getElementById('horizon-line');
-  if (hLine) {
-    hLine.style.transform = `translateY(${pitchDeg * 8}px) rotate(${rollDeg * 12}deg)`;
-  }
+  if (hLine) hLine.style.transform = `translateY(${pitchDeg * 8}px) rotate(${rollDeg * 12}deg)`;
 
-  // Active draw power
   const drawVal = (34.0 + Math.sin(time * 5) * 1.8).toFixed(1);
   const drawEl = document.getElementById('val-draw');
   if (drawEl) drawEl.textContent = `${drawVal} W`;
