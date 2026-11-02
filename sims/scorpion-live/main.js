@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
 // =========================================================================
-// SCORPIO SC-9 · BIONIC OCTOPOD EXOSKELETON & HEAVY ALL-TERRAIN ROVER
-// HIGH-TORQUE MANIPULATOR / FIELD SIMULATOR
-// Exact match to user lab console standard & high-fidelity 3D teardown
+// TELSON SC-8 · ROBOTIC SCORPION ARMOURED GROUND UNIT
+// OCTOPOD WALKER / FIELD SIMULATOR & 3D STRIKE TEARDOWN
+// Exact 1:1 recreation of reference engineering lab console (docs/scorpion.gif)
 // =========================================================================
 
 const app = document.getElementById('app');
@@ -31,6 +31,7 @@ style.textContent = `
   #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; }
   #gl { width: 100%; height: 100%; display: block; cursor: grab; }
   #gl.grabbing { cursor: grabbing; }
+  #labels-canvas { position: absolute; inset: 0; pointer-events: none; width: 100%; height: 100%; z-index: 10; }
 
   /* UI Layer */
   #hud-layer { position: absolute; inset: 0; pointer-events: none; z-index: 20; padding: 18px 24px; display: flex; flex-direction: column; justify-content: space-between; }
@@ -74,27 +75,23 @@ style.textContent = `
   .metric-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
   .metric-big { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 800; letter-spacing: -1px; color: var(--text-dark); line-height: 1; }
   .metric-unit { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+  .metric-sub { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-dark); }
 
-  /* Stinger Hydraulic Canvas */
+  /* Gait Stance Canvas */
   .wave-canvas { width: 100%; height: 42px; border-bottom: 1px solid var(--border-line); margin-bottom: 6px; display: block; }
   .wave-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); }
 
-  /* Battery Gauge */
-  .power-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-line); font-family: 'JetBrains Mono', monospace; }
-  .power-sub { font-size: 7.5px; color: var(--text-muted); text-transform: uppercase; }
-  .power-val { font-size: 10px; font-weight: 700; color: var(--text-dark); }
-  .battery-bars { display: flex; gap: 2px; height: 12px; margin-top: 4px; }
-  .battery-seg { flex: 1; border-radius: 1px; background: #e5e2da; }
-  .battery-seg.fill-red { background: var(--accent-orange); }
-  .battery-seg.fill-green { background: var(--accent-green); }
+  /* Speedometer Semi-circle for Strike */
+  .gauge-box { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .gauge-dial { width: 68px; height: 36px; border-top-left-radius: 40px; border-top-right-radius: 40px; border: 4px solid #e8e4dc; border-bottom: none; position: relative; overflow: hidden; }
+  .gauge-needle { position: absolute; bottom: 0; left: 50%; width: 28px; height: 2px; background: var(--accent-orange); transform-origin: left center; transform: rotate(45deg); transition: transform 0.2s ease; }
 
   /* Leg Servo Rows */
-  .servo-row { display: flex; align-items: center; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9px; margin-bottom: 4px; }
+  .servo-row { display: flex; align-items: center; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9px; margin-bottom: 3.5px; }
   .servo-name { width: 22px; font-weight: 700; color: var(--text-dark); }
   .servo-track { flex: 1; height: 4px; background: #e8e4dc; border-radius: 2px; margin: 0 8px; overflow: hidden; }
-  .servo-fill { height: 100%; background: var(--accent-orange); transition: width 0.3s ease; }
-  .servo-val { width: 44px; text-align: right; font-weight: 600; color: var(--text-dark); }
-  .servo-val.detached { color: var(--accent-orange); font-size: 7.5px; font-weight: 700; }
+  .servo-fill { height: 100%; background: var(--text-dark); transition: width 0.3s ease; }
+  .servo-val { width: 40px; text-align: right; font-weight: 600; color: var(--text-dark); }
 
   /* Buttons Grid */
   .btn-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 4px; }
@@ -119,204 +116,174 @@ style.textContent = `
     border-color: var(--accent-orange);
   }
 
-  /* Attitude Horizon */
-  .gimbal-box { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .gimbal-circle { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border-line); background: #eeebe3; position: relative; overflow: hidden; }
-  .gimbal-horizon { position: absolute; left: -10px; right: -10px; top: 50%; height: 1.5px; background: var(--accent-orange); transform-origin: center; }
-  .gimbal-sub { flex: 1; display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace; }
-  .gimbal-row { display: flex; justify-content: space-between; font-size: 8.5px; }
-  .gimbal-lbl { color: var(--text-muted); }
-  .gimbal-val { font-weight: 700; color: var(--text-dark); }
-
-  /* Subsystems */
-  .subsys-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dotted var(--border-line); font-family: 'JetBrains Mono', monospace; font-size: 8px; }
+  /* Subsystems List */
+  .subsys-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0ede6; }
   .subsys-item:last-child { border-bottom: none; }
-  .subsys-left { display: flex; flex-direction: column; }
-  .subsys-name { font-weight: 700; color: var(--text-dark); text-transform: uppercase; }
-  .subsys-desc { color: var(--text-muted); font-size: 7px; }
-  .subsys-tag { font-size: 7.5px; font-weight: 700; padding: 2px 5px; border-radius: 2px; }
+  .subsys-left { display: flex; flex-direction: column; gap: 1px; }
+  .subsys-name { font-size: 8.5px; font-weight: 700; color: var(--text-dark); font-family: 'JetBrains Mono', monospace; }
+  .subsys-desc { font-size: 7.5px; color: var(--text-muted); }
+  .subsys-tag { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 1px 6px; border-radius: 2px; }
   .subsys-tag.green { background: var(--accent-green-bg); color: var(--accent-green); }
   .subsys-tag.orange { background: var(--accent-orange-bg); color: var(--accent-orange); }
 
-  /* Operating Mode Center Title */
-  .flight-mode-anchor { position: absolute; left: 24px; bottom: 84px; pointer-events: none; }
-  .flight-mode-tag { font-size: 8.5px; font-weight: 700; letter-spacing: 1.4px; color: var(--text-muted); text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
-  .flight-mode-title { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent-orange); line-height: 1; margin: 3px 0; }
-  .flight-mode-sub { font-size: 9px; font-weight: 600; letter-spacing: 1.2px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; }
+  /* Center Bottom Status Overlay */
+  .flight-mode-tag {
+    position: absolute;
+    left: 270px;
+    bottom: 96px;
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+  }
+  .flight-mode-sub { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+  .flight-mode-big { font-size: 26px; font-weight: 800; color: var(--accent-orange); letter-spacing: -0.5px; line-height: 1.1; }
+  .flight-mode-spec { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; color: var(--text-muted); text-transform: uppercase; margin-top: 3px; letter-spacing: 0.5px; }
 
-  /* Bottom Bar */
-  .bottom-bar { display: flex; align-items: center; gap: 16px; background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 8px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); pointer-events: auto; }
-  .play-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-orange); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.1s; }
-  .play-btn:active { transform: scale(0.95); }
+  /* Bottom Timeline Bar */
+  .bottom-bar { background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 8px 18px; display: flex; align-items: center; gap: 18px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+  .play-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--accent-orange); border: none; cursor: pointer; display: grid; place-items: center; color: #fff; flex-shrink: 0; box-shadow: 0 2px 6px rgba(255, 72, 0, 0.3); }
   .play-btn svg { width: 14px; height: 14px; fill: currentColor; }
-  .timeline-track { flex: 1; height: 3px; background: #e3dfd7; border-radius: 2px; position: relative; display: flex; align-items: center; cursor: pointer; }
-  .timeline-progress { height: 100%; background: var(--accent-orange); border-radius: 2px; width: 46%; }
-  .timeline-thumb { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--accent-orange); position: absolute; left: 46%; transform: translateX(-50%); }
-  .timeline-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8.5px; color: var(--text-muted); }
+  .timeline-track { flex: 1; height: 5px; background: #e5e1d7; border-radius: 2px; position: relative; cursor: pointer; }
+  .timeline-progress { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-orange); border-radius: 2px; width: 18%; }
+  .timeline-thumb { position: absolute; left: 18%; top: 50%; width: 12px; height: 12px; background: #fff; border: 2.5px solid var(--accent-orange); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+  .timeline-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); }
 
-  /* 3D Callout Labels */
-  #labels-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 15; width: 100%; height: 100%; }
+  /* Screen Space Callout Labels */
   .dom-label {
     position: absolute;
-    transform: translate(0, -50%);
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid var(--border-line);
-    border-left: 3px solid var(--accent-orange);
-    padding: 3px 8px;
-    border-radius: 2px;
+    pointer-events: none;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
+    font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.5px;
     color: var(--text-dark);
+    letter-spacing: 0.8px;
     white-space: nowrap;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    pointer-events: none;
-    transition: opacity 0.3s;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    transform: translate(12px, -50%);
+    background: rgba(255, 255, 255, 0.85);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border-left: 2px solid var(--accent-orange);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
-  .dom-label .sub {
-    font-size: 6.5px;
-    color: var(--text-muted);
-    font-weight: 500;
-    display: block;
-    margin-top: 1px;
-  }
-
-  /* Grid overlay */
-  .grid-bg-overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image: 
-      radial-gradient(circle at 50% 50%, rgba(0,0,0,0.015) 0%, transparent 70%),
-      linear-gradient(to right, rgba(0,0,0,0.02) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(0,0,0,0.02) 1px, transparent 1px);
-    background-size: 100% 100%, 40px 40px, 40px 40px;
-  }
+  .dom-label .sub { display: block; font-size: 7.5px; font-weight: 500; color: var(--text-muted); }
 `;
 document.head.appendChild(style);
 
 app.innerHTML = `
   <div id="canvas-container">
     <canvas id="gl"></canvas>
-    <div class="grid-bg-overlay"></div>
     <canvas id="labels-canvas"></canvas>
   </div>
 
   <div id="hud-layer">
     <!-- Top Bar -->
-    <div class="top-bar">
-      <div class="brand-group interactive">
+    <div class="top-bar interactive">
+      <div class="brand-group">
         <div class="logo-box">
-          <svg viewBox="0 0 24 24"><path d="M19 8l-3-3v2H8V5L5 8l3 3V9h8v2l3-3zm-7 5c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4zm0 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-          <span>SC-9</span>
+          <svg viewBox="0 0 24 24"><path d="M12 2l3 5h6l-5 4 2 6-6-4-6 4 2-6-5-4h6z"/></svg>
+          SC-8
         </div>
         <div class="title-block">
-          <div class="title-tag">BIONIC OCTOPOD EXOSKELETON · HEAVY ALL-TERRAIN ROVER</div>
-          <div class="title-main">Scorpio SC-9<span>/</span></div>
-          <div class="title-sub">HIGH-TORQUE MANIPULATOR / FIELD SIMULATOR</div>
+          <div class="title-tag">ROBOTIC SCORPION · ARMOURED GROUND UNIT</div>
+          <div class="title-main">Telson SC-8<span>/</span></div>
+          <div class="title-sub">OCTOPOD WALKER / FIELD SIMULATOR</div>
         </div>
       </div>
 
-      <!-- Top Center Specs -->
-      <div class="top-center interactive">
+      <div class="top-center">
         <div class="spec-item">
-          <span class="spec-label">HYDRAULIC LOAD</span>
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <span class="spec-label">DRIVE LOAD</span>
+            <span class="spec-label" style="color:var(--text-dark); font-weight:700;">58%</span>
+          </div>
           <div class="lift-load-bar" id="load-bar"></div>
+          <div style="display:flex; justify-content:space-between; font-size:6.5px; color:var(--text-muted); margin-top:1px;">
+            <span>IDLE</span>
+            <span>CRUISE</span>
+            <span>MAX</span>
+          </div>
         </div>
+
         <div class="spec-item">
           <span class="spec-label">SIM ID</span>
-          <span class="spec-val">SC9-0824</span>
+          <span class="spec-val">SC8-0730</span>
         </div>
+
         <div class="spec-item">
           <span class="spec-label">RUNTIME</span>
-          <span class="spec-val" id="val-runtime">00:14:32</span>
+          <span class="spec-val" id="val-runtime">00:00:03</span>
         </div>
+
         <div class="spec-item">
-          <span class="spec-label">STATUS</span>
           <span class="status-badge" id="val-status">
             <span class="status-dot"></span>
-            <span id="val-status-text">STRIKE ARMED</span>
+            <span id="val-status-text">STANDING</span>
           </span>
         </div>
+
         <div class="spec-item">
           <span class="spec-label">OPERATOR</span>
-          <span class="spec-val">DESERT LAB 4 · K.S.</span>
+          <span class="spec-val">BAY 2 - M.V.</span>
         </div>
       </div>
     </div>
 
-    <!-- Operating Mode Floating Tag -->
-    <div class="flight-mode-anchor">
-      <div class="flight-mode-tag">OPERATING MODE</div>
-      <div class="flight-mode-title" id="mode-title">STRIKE ARMED</div>
-      <div class="flight-mode-sub" id="mode-desc">HEXAPOD WAVE GAIT · 18.5 CM CLEARANCE</div>
+    <!-- Center Floating Flight Status Tag -->
+    <div class="flight-mode-tag">
+      <span class="flight-mode-sub">OPERATION MODE</span>
+      <span class="flight-mode-big" id="mode-title">STANDING</span>
+      <span class="flight-mode-spec" id="mode-desc">CLAW L · 0% APART</span>
     </div>
 
-    <!-- Panels Wrapper -->
+    <!-- Left & Right Telemetry Panels -->
     <div class="panels-wrapper">
       <!-- Left Column -->
       <div class="panel-col-left">
-        <!-- 01 STINGER TAIL -->
+        <!-- 01 GAIT -->
         <div class="tech-card">
           <div class="card-header">
-            <span class="card-title">STINGER TAIL</span>
+            <span class="card-title">GAIT</span>
             <span class="card-idx">01</span>
           </div>
           <div class="metric-row">
             <div>
-              <span class="metric-big" id="val-force">320</span><span class="metric-unit">N</span>
-              <div style="font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono'; text-transform:uppercase;">STRIKE FORCE</div>
+              <span class="metric-big" id="val-gait">0.0</span>
+              <span class="metric-unit">HZ</span>
+              <div style="font-size:7.5px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">STRIDE RATE</div>
             </div>
             <div style="text-align:right;">
-              <span class="metric-big" id="val-vel">7.2</span><span class="metric-unit">M/S</span>
-              <div style="font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono'; text-transform:uppercase;">VELOCITY</div>
+              <span class="metric-sub" id="val-speed">0 MM/S</span>
             </div>
           </div>
-          <canvas class="wave-canvas" id="stinger-canvas" width="200" height="42"></canvas>
+          <canvas class="wave-canvas" id="gait-canvas" width="190" height="42"></canvas>
           <div class="wave-meta">
-            <span>6 HYDRAULIC JOINTS</span>
-            <span id="valve-status" style="color:var(--accent-green); font-weight:700;">VALVE ARMED</span>
+            <span>PATTERN <strong>STANCE · 8 FEET</strong></span>
+            <span>DUTY <strong>100%</strong></span>
           </div>
         </div>
 
-        <!-- 02 POWER -->
+        <!-- 02 TAIL STRIKE -->
         <div class="tech-card">
           <div class="card-header">
-            <span class="card-title">POWER</span>
+            <span class="card-title">TAIL STRIKE</span>
             <span class="card-idx">02</span>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="gauge-box">
             <div>
-              <span class="metric-big">82</span><span class="metric-unit">%</span>
-              <div style="font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono';">BATTERY</div>
+              <span class="metric-big" id="val-strike">140</span>
+              <span class="metric-unit">°</span>
+              <div style="font-size:7.5px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">STRIKE ANGLE</div>
             </div>
-            <div class="battery-bars" style="width: 100px;">
-              <div class="battery-seg fill-red"></div>
-              <div class="battery-seg fill-red"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg fill-green"></div>
-              <div class="battery-seg"></div>
-              <div class="battery-seg"></div>
+            <div class="gauge-dial">
+              <div class="gauge-needle" id="strike-needle"></div>
             </div>
           </div>
-          <div class="power-stats">
-            <div>
-              <div class="power-sub">DRAW</div>
-              <div class="power-val" id="val-draw">44.0 W</div>
-            </div>
-            <div>
-              <div class="power-sub">CELL</div>
-              <div class="power-val">4.10 V</div>
-            </div>
-            <div>
-              <div class="power-sub">MOTOR</div>
-              <div class="power-val">42 °C</div>
-            </div>
+          <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:6px; border-top:1px solid var(--border-line); font-family:'JetBrains Mono'; font-size:8px; color:var(--text-muted); text-transform:uppercase;">
+            <div>VELOCITY <strong style="color:var(--text-dark);">0 °/S</strong></div>
+            <div>TORQUE <strong style="color:var(--text-dark);">7.6 N·M</strong></div>
+            <div>BLADE <strong style="color:var(--text-dark);" id="tag-blade">LOCKED</strong></div>
           </div>
         </div>
 
@@ -326,9 +293,10 @@ app.innerHTML = `
             <span class="card-title">LEG SERVOS</span>
             <span class="card-idx">03</span>
           </div>
-          <div style="display:flex; justify-content:space-between; font-size:7.5px; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:6px;">
-            <span>LOAD PER LEG · KNEE TORQUE</span>
-            <span class="subsys-tag green" id="legs-mode-tag">GAIT LOCK</span>
+          <div style="display:flex; justify-content:space-between; font-size:7.5px; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:6px; text-transform:uppercase;">
+            <span>LOAD PER LEG</span>
+            <span>KNEE TORQUE</span>
+            <span style="color:var(--accent-green); font-weight:700;">HOLDING</span>
           </div>
           <div id="arm-rows"></div>
         </div>
@@ -336,35 +304,35 @@ app.innerHTML = `
 
       <!-- Right Column -->
       <div class="panel-col-right">
-        <!-- 04 ATTITUDE -->
+        <!-- 04 CLAW GRIP -->
         <div class="tech-card">
           <div class="card-header">
-            <span class="card-title">ATTITUDE</span>
+            <span class="card-title">CLAW GRIP</span>
             <span class="card-idx">04</span>
           </div>
-          <div class="gimbal-box">
-            <div class="gimbal-circle">
-              <div class="gimbal-horizon" id="gimbal-line"></div>
+          <div class="metric-row">
+            <div>
+              <span class="metric-big" id="val-grip">52</span>
+              <span class="metric-unit">N</span>
+              <div style="font-size:7.5px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">GRIP FORCE</div>
             </div>
-            <div class="gimbal-sub">
-              <div class="gimbal-row">
-                <span class="gimbal-lbl">CLEARANCE</span>
-                <span class="gimbal-val">18.5 CM</span>
-              </div>
-              <div class="gimbal-row">
-                <span class="gimbal-lbl">PITCH</span>
-                <span class="gimbal-val" id="val-pitch">+0.82°</span>
-              </div>
-              <div class="gimbal-row">
-                <span class="gimbal-lbl">ROLL</span>
-                <span class="gimbal-val" id="val-roll">-0.45°</span>
-              </div>
+            <div style="width:80px; height:24px;">
+              <canvas id="grip-canvas" width="80" height="24"></canvas>
             </div>
           </div>
-          <div style="display:flex; justify-content:space-between; font-size:8px; font-family:'JetBrains Mono'; color:var(--text-muted); border-top:1px solid var(--border-line); padding-top:4px;">
-            <span>GROUND</span>
-            <span>TRACTION</span>
-            <span>SPEED <b style="color:var(--text-dark);">0.82 M/S</b></span>
+          <div style="display:flex; flex-direction:column; gap:4px; font-family:'JetBrains Mono'; font-size:8.5px; margin-top:4px;">
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:var(--text-muted);">CLAW L</span>
+              <span style="font-weight:700;" id="val-claw-l">15°</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:var(--text-muted);">CLAW R</span>
+              <span style="font-weight:700;" id="val-claw-r">12°</span>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:6px; border-top:1px solid var(--border-line); font-family:'JetBrains Mono'; font-size:8px; color:var(--text-muted); text-transform:uppercase;">
+            <span>MODE <strong>HOLD</strong></span>
+            <span>APERTURE <strong>12°</strong></span>
           </div>
         </div>
 
@@ -376,11 +344,11 @@ app.innerHTML = `
           </div>
           <div class="btn-grid-3">
             <button class="pill-btn active" data-assembly="hero">HERO</button>
-            <button class="pill-btn" data-assembly="chelae">CHELAE</button>
-            <button class="pill-btn" data-assembly="stinger">STINGER</button>
+            <button class="pill-btn" data-assembly="claw">CLAW L</button>
+            <button class="pill-btn" data-assembly="tail">TAIL</button>
+            <button class="pill-btn" data-assembly="leg">LEG L2</button>
             <button class="pill-btn" data-assembly="carapace">CARAPACE</button>
-            <button class="pill-btn" data-assembly="legs">LEGS</button>
-            <button class="pill-btn" data-assembly="optics">OPTICS</button>
+            <button class="pill-btn" data-assembly="strike">STRIKE</button>
           </div>
         </div>
 
@@ -390,10 +358,10 @@ app.innerHTML = `
             <span class="card-title">DISPLAY</span>
             <span class="card-idx">06</span>
           </div>
-          <div class="btn-grid-3">
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px;">
             <button class="pill-btn active" id="btn-labels">LABELS</button>
             <button class="pill-btn" id="btn-exploded">EXPLODED</button>
-            <button class="pill-btn" id="btn-strike" style="color:var(--accent-orange);">STRIKE ⚡</button>
+            <button class="pill-btn" id="btn-walk">WALK GAIT</button>
           </div>
           <div style="margin-top:4px;">
             <button class="pill-btn" id="btn-turntable" style="width:100%;">TURNTABLE</button>
@@ -408,45 +376,45 @@ app.innerHTML = `
           </div>
           <div class="subsys-item">
             <div class="subsys-left">
-              <span class="subsys-name">01 CHELAE CLAWS</span>
-              <span class="subsys-desc">DUAL 3-AXIS HYDRAULIC PINCERS</span>
+              <span class="subsys-name">01 SENSOR HEAD</span>
+              <span class="subsys-desc">2 MEDIAN · 4 LATERAL OPTICS</span>
             </div>
-            <span class="subsys-tag green" id="sub-chelae-tag">ARMED</span>
+            <span class="subsys-tag green" id="sub-01">TRACKING</span>
           </div>
           <div class="subsys-item">
             <div class="subsys-left">
-              <span class="subsys-name">02 STINGER TAIL</span>
-              <span class="subsys-desc">6 PIVOT JOINTS · TITANIUM SPUR</span>
+              <span class="subsys-name">02 CLAW DRIVES</span>
+              <span class="subsys-desc">2 CHELAE · 4-GEAR TRAINS</span>
             </div>
-            <span class="subsys-tag green" id="sub-stinger-tag">LOCKED</span>
+            <span class="subsys-tag green" id="sub-02">LOCKED</span>
           </div>
           <div class="subsys-item">
             <div class="subsys-left">
-              <span class="subsys-name">03 CARAPACE</span>
-              <span class="subsys-desc">5 ARTICULATED CERAMIC PLATES</span>
+              <span class="subsys-name">03 CARAPACE CORE</span>
+              <span class="subsys-desc">5 PLATES · GLASS CANOPY</span>
             </div>
-            <span class="subsys-tag green" id="sub-carapace-tag">SEALED</span>
+            <span class="subsys-tag green" id="sub-03">RIVETED</span>
           </div>
           <div class="subsys-item">
             <div class="subsys-left">
-              <span class="subsys-name">04 WALKING GEAR</span>
-              <span class="subsys-desc">8 INDEPENDENT SERVO LEGS</span>
+              <span class="subsys-name">04 TAIL ACTUATORS</span>
+              <span class="subsys-desc">5 LINKS · 8 SERVOS</span>
             </div>
-            <span class="subsys-tag green" id="sub-legs-tag">ENGAGED</span>
+            <span class="subsys-tag green" id="sub-04">ARCHED</span>
           </div>
           <div class="subsys-item">
             <div class="subsys-left">
-              <span class="subsys-name">05 OCULAR SENSORS</span>
-              <span class="subsys-desc">TRIPLE STEREO CAMERA</span>
+              <span class="subsys-name">05 LEG SERVOS</span>
+              <span class="subsys-desc">8 LEGS · 4 JOINTS</span>
             </div>
-            <span class="subsys-tag green">TRACKING</span>
+            <span class="subsys-tag green" id="sub-05">HOLDING</span>
           </div>
           <div class="subsys-item">
             <div class="subsys-left">
-              <span class="subsys-name">06 HYDRAULICS</span>
-              <span class="subsys-desc">240 BAR CLOSED-LOOP MANIFOLD</span>
+              <span class="subsys-name">06 STINGER</span>
+              <span class="subsys-desc">BLADE LOCK · PUMP</span>
             </div>
-            <span class="subsys-tag green">NOMINAL</span>
+            <span class="subsys-tag green" id="sub-06">PRIMED</span>
           </div>
         </div>
       </div>
@@ -459,10 +427,10 @@ app.innerHTML = `
       </button>
       <div style="flex:1;">
         <div style="display:flex; justify-content:space-between; font-size:7.5px; font-weight:700; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:4px; text-transform:uppercase;">
-          <span style="color:var(--text-dark); display:flex; align-items:center; gap:4px;"><span style="color:var(--accent-orange);">|</span> MISSION LOG</span>
-          <span>START</span>
-          <span style="color:var(--accent-orange); font-weight:700;" id="timeline-operator-text">OPERATOR · SCORPIO PATROL RELEASE</span>
-          <span>SECURE</span>
+          <span style="color:var(--text-dark); display:flex; align-items:center; gap:4px;"><span style="color:var(--accent-orange);">|</span> OPERATION LOG</span>
+          <span>DEPLOY</span>
+          <span style="color:var(--accent-orange); font-weight:700;" id="timeline-operator-text">OPERATOR · ISOLATE CLAW L</span>
+          <span>RECALL</span>
           <span class="card-idx">08</span>
         </div>
         <div class="timeline-track" id="timeline-track">
@@ -470,8 +438,8 @@ app.innerHTML = `
           <div class="timeline-thumb" id="timeline-thumb"></div>
         </div>
         <div class="timeline-meta" style="margin-top:4px;">
-          <span id="timeline-time">00:14 / 00:30</span>
-          <span>12 OPERATOR ACTIONS</span>
+          <span id="timeline-time">00:03 / 00:26</span>
+          <span>9 OPERATOR ACTIONS</span>
         </div>
       </div>
     </div>
@@ -482,21 +450,21 @@ app.innerHTML = `
 const loadBar = document.getElementById('load-bar');
 for (let i = 0; i < 20; i++) {
   const seg = document.createElement('div');
-  seg.className = `lift-seg ${i < 13 ? 'fill' : ''}`;
+  seg.className = `lift-seg ${i < 12 ? 'fill' : ''}`;
   loadBar.appendChild(seg);
 }
 
-// Populate 8 Leg rows (L1..L4, R1..R4)
+// Populate 8 Leg Servos rows (L1..L4, R1..R4) matching docs/scorpion_f0.png
 const armRowsContainer = document.getElementById('arm-rows');
 const legData = [
-  { id: 'L1', val: 58 },
-  { id: 'L2', val: 76 },
-  { id: 'L3', val: 64 },
-  { id: 'L4', val: 71 },
-  { id: 'R1', val: 55 },
-  { id: 'R2', val: 74 },
-  { id: 'R3', val: 62 },
-  { id: 'R4', val: 69 }
+  { id: 'L1', val: 48 },
+  { id: 'L2', val: 47 },
+  { id: 'L3', val: 44 },
+  { id: 'L4', val: 39 },
+  { id: 'R1', val: 43 },
+  { id: 'R2', val: 42 },
+  { id: 'R3', val: 46 },
+  { id: 'R4', val: 38 }
 ];
 
 legData.forEach(item => {
@@ -514,7 +482,7 @@ legData.forEach(item => {
 });
 
 // =========================================================================
-// THREE.JS 3D SCENE SETUP
+// THREE.JS 3D SCENE SETUP & STUDIO LIGHTING
 // =========================================================================
 
 const canvas = document.getElementById('gl');
@@ -525,7 +493,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf6f4f0);
 
 const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(3.4, 2.2, 3.8);
+camera.position.set(4.6, 2.6, 4.4);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -547,317 +515,455 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// =========================================================================
-// LIGHTING & SHADOW GROUND
-// =========================================================================
-
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.15);
+// Studio Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.25);
 scene.add(ambientLight);
 
-const mainKeyLight = new THREE.DirectionalLight(0xffffff, 2.2);
-mainKeyLight.position.set(5, 8, 5);
+const mainKeyLight = new THREE.DirectionalLight(0xfffbf5, 2.6);
+mainKeyLight.position.set(6, 9, 6);
 mainKeyLight.castShadow = true;
 mainKeyLight.shadow.mapSize.width = 2048;
 mainKeyLight.shadow.mapSize.height = 2048;
+mainKeyLight.shadow.camera.near = 0.5;
+mainKeyLight.shadow.camera.far = 25;
+mainKeyLight.shadow.camera.left = -5;
+mainKeyLight.shadow.camera.right = 5;
+mainKeyLight.shadow.camera.top = 5;
+mainKeyLight.shadow.camera.bottom = -5;
 mainKeyLight.shadow.bias = -0.0001;
 scene.add(mainKeyLight);
 
-const fillLight = new THREE.DirectionalLight(0xffeedd, 0.7);
-fillLight.position.set(-5, 3, -3);
+const fillLight = new THREE.DirectionalLight(0xedf4ff, 0.9);
+fillLight.position.set(-6, 3, -5);
 scene.add(fillLight);
 
-// Floor
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.ShadowMaterial({ opacity: 0.14 }));
+// Studio Floor Shadow Receiver
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(36, 36), new THREE.ShadowMaterial({ opacity: 0.16 }));
 floor.rotation.x = -Math.PI / 2;
-floor.position.y = -0.85;
+floor.position.y = -0.92;
 floor.receiveShadow = true;
 scene.add(floor);
 
-const gridHelper = new THREE.GridHelper(12, 24, 0xd0ccc3, 0xe5e1d7);
-gridHelper.position.y = -0.84;
+// Precision Grid Helper
+const gridHelper = new THREE.GridHelper(14, 28, 0xd8d4cc, 0xe9e5dc);
+gridHelper.position.y = -0.91;
 scene.add(gridHelper);
 
-// Orbit Rings
+// 3D Orbit Calibration Circles
 const orbitRingsGroup = new THREE.Group();
 scene.add(orbitRingsGroup);
-[1.3, 1.9, 2.6].forEach(r => {
+[1.3, 2.2, 3.2].forEach(r => {
   const circleGeo = new THREE.BufferGeometry();
   const pts = [];
-  for (let a = 0; a <= 64; a++) {
-    const ang = (a / 64) * Math.PI * 2;
+  for (let a = 0; a <= 72; a++) {
+    const ang = (a / 72) * Math.PI * 2;
     pts.push(new THREE.Vector3(Math.cos(ang) * r, 0, Math.sin(ang) * r));
   }
   circleGeo.setFromPoints(pts);
-  const ringLine = new THREE.Line(circleGeo, new THREE.LineDashedMaterial({ color: 0xcdcac0, dashSize: 0.08, gapSize: 0.06 }));
+  const ringLine = new THREE.Line(circleGeo, new THREE.LineDashedMaterial({ color: 0xd2cfc6, dashSize: 0.08, gapSize: 0.06 }));
   ringLine.computeLineDistances();
-  ringLine.position.y = 0.15;
+  ringLine.position.y = 0.1;
   orbitRingsGroup.add(ringLine);
 });
 
 // =========================================================================
-// MATERIALS
+// PREMIUM STUDIO MATERIALS
 // =========================================================================
 
-const whiteMat = new THREE.MeshStandardMaterial({
+const whiteShellMat = new THREE.MeshStandardMaterial({
   color: 0xfaf8f5,
-  metalness: 0.1,
+  metalness: 0.08,
   roughness: 0.22
 });
 
 const orangeMat = new THREE.MeshStandardMaterial({
   color: 0xff4800,
-  metalness: 0.4,
-  roughness: 0.28
+  metalness: 0.42,
+  roughness: 0.26
 });
 
 const darkMechMat = new THREE.MeshStandardMaterial({
-  color: 0x18181a,
-  metalness: 0.85,
+  color: 0x18181b,
+  metalness: 0.88,
   roughness: 0.35
 });
 
+const chromeMat = new THREE.MeshStandardMaterial({
+  color: 0xe6e4e0,
+  metalness: 0.95,
+  roughness: 0.12
+});
+
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  transmission: 0.92,
+  opacity: 0.85,
+  transparent: true,
+  roughness: 0.08,
+  thickness: 0.06,
+  clearcoat: 1.0,
+  side: THREE.DoubleSide
+});
+
 const lensMat = new THREE.MeshPhysicalMaterial({
-  color: 0x050b14,
-  metalness: 0.9,
-  roughness: 0.05,
-  transmission: 0.5,
-  reflectivity: 0.95
+  color: 0x050b16,
+  metalness: 0.92,
+  roughness: 0.04,
+  transmission: 0.65,
+  reflectivity: 0.95,
+  clearcoat: 1.0
 });
 
 // =========================================================================
-// 3D MODEL HIERARCHY: SCORPIO SC-9
+// 3D MODEL HIERARCHY: TELSON SC-8 (ROBOTIC SCORPION)
 // =========================================================================
 
-const scorpionRoot = new THREE.Group();
-scene.add(scorpionRoot);
+const scorpRoot = new THREE.Group();
+scene.add(scorpRoot);
 
+const chassisGroup = new THREE.Group();
+const headGroup = new THREE.Group();
 const carapaceGroup = new THREE.Group();
-const stingerGroup = new THREE.Group();
-const chelaeLGroup = new THREE.Group();
-const chelaeRGroup = new THREE.Group();
+const clawsGroup = new THREE.Group();
 const legsGroup = new THREE.Group();
-const opticsGroup = new THREE.Group();
+const tailGroup = new THREE.Group();
+const hardwareGroup = new THREE.Group();
 
-scorpionRoot.add(carapaceGroup);
-scorpionRoot.add(stingerGroup);
-scorpionRoot.add(chelaeLGroup);
-scorpionRoot.add(chelaeRGroup);
-scorpionRoot.add(legsGroup);
-scorpionRoot.add(opticsGroup);
+scorpRoot.add(chassisGroup);
+scorpRoot.add(headGroup);
+scorpRoot.add(carapaceGroup);
+scorpRoot.add(clawsGroup);
+scorpRoot.add(legsGroup);
+scorpRoot.add(tailGroup);
+scorpRoot.add(hardwareGroup);
 
-// --- 1. SEGMENTED CARAPACE (5 Armored Shell Tiers) ---
+// --- 1. SENSOR HEAD (PROSOMA & CHELICERAE) ---
+headGroup.position.set(0, 0.08, 0.62);
+
+const headVisor = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.22, 0.42), whiteShellMat);
+headVisor.position.y = 0.04;
+headVisor.castShadow = true;
+headGroup.add(headVisor);
+
+// 2 Median Primary Optics
+[-0.08, 0.08].forEach(x => {
+  const eyeRim = new THREE.Mesh(new THREE.TorusGeometry(0.042, 0.012, 10, 20), orangeMat);
+  eyeRim.position.set(x, 0.08, 0.21);
+  headGroup.add(eyeRim);
+
+  const eyeGlass = new THREE.Mesh(new THREE.SphereGeometry(0.038, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), lensMat);
+  eyeGlass.rotation.x = -Math.PI / 2;
+  eyeGlass.position.copy(eyeRim.position);
+  headGroup.add(eyeGlass);
+});
+
+// 4 Lateral Amber Optic Sensors
+[
+  { x: -0.22, y: 0.05, z: 0.16 },
+  { x: -0.24, y: -0.02, z: 0.1 },
+  { x: 0.22, y: 0.05, z: 0.16 },
+  { x: 0.24, y: -0.02, z: 0.1 }
+].forEach(dot => {
+  const amberDot = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 10), orangeMat);
+  amberDot.position.set(dot.x, dot.y, dot.z);
+  headGroup.add(amberDot);
+});
+
+// Chelicerae (Front Mouth Pincers)
+const cheliL = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.12, 0.1), darkMechMat);
+cheliL.position.set(-0.08, -0.12, 0.24);
+cheliL.rotation.set(0.4, 0, -0.15);
+headGroup.add(cheliL);
+
+const cheliR = cheliL.clone();
+cheliR.position.x = 0.08;
+cheliR.rotation.z = 0.15;
+headGroup.add(cheliR);
+
+// --- 2. 5-TIER DORSAL CARAPACE PLATES ---
+carapaceGroup.position.set(0, 0.16, 0);
+
 const carapacePlates = [];
-for (let c = 0; c < 5; c++) {
-  const plate = new THREE.Mesh(
-    new THREE.BoxGeometry(0.75 - c * 0.08, 0.16, 0.32 - c * 0.02),
-    whiteMat
-  );
-  plate.position.set(0, 0.06 + c * 0.03, 0.25 - c * 0.22);
+for (let p = 0; p < 5; p++) {
+  const plateGroup = new THREE.Group();
+  plateGroup.position.set(0, (4 - p) * 0.03, 0.38 - p * 0.24);
+
+  const width = 0.72 - p * 0.05;
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(width, 0.09, 0.22), whiteShellMat);
   plate.castShadow = true;
   plate.receiveShadow = true;
-  carapaceGroup.add(plate);
+  plateGroup.add(plate);
 
-  const accent = new THREE.Mesh(new THREE.BoxGeometry(0.78 - c * 0.08, 0.02, 0.04), orangeMat);
-  accent.position.set(0, 0.14 + c * 0.03, 0.36 - c * 0.22);
-  carapaceGroup.add(accent);
+  // Central spine crest ridge
+  const crest = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.2, 4), orangeMat);
+  crest.rotation.x = Math.PI / 2;
+  crest.position.set(0, 0.06, 0);
+  plateGroup.add(crest);
 
-  carapacePlates.push(plate);
+  // Lateral rivet studs
+  [-width * 0.42, width * 0.42].forEach(rx => {
+    const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 8), darkMechMat);
+    rivet.position.set(rx, 0.05, 0);
+    plateGroup.add(rivet);
+  });
+
+  carapaceGroup.add(plateGroup);
+  carapacePlates.push(plateGroup);
 }
 
-const chassisMesh = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.2, 0.9), darkMechMat);
-chassisMesh.position.set(0, -0.05, -0.1);
-chassisMesh.castShadow = true;
-carapaceGroup.add(chassisMesh);
+// Underneath Chassis Machinery (Dense Black Chassis & Manifolds)
+const underChassis = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.24, 1.2), darkMechMat);
+underChassis.position.set(0, -0.04, -0.1);
+underChassis.castShadow = true;
+chassisGroup.add(underChassis);
 
-// --- 2. TRIPLE STEREO OPTIC SENSORS ---
-for (let e = -1; e <= 1; e++) {
-  const eye = new THREE.Group();
-  const eyeBase = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.08, 16), darkMechMat);
-  eyeBase.rotation.x = Math.PI / 2;
-  eye.add(eyeBase);
-
-  const eyeBezel = new THREE.Mesh(new THREE.TorusGeometry(0.062, 0.012, 10, 20), orangeMat);
-  eyeBezel.position.z = 0.04;
-  eye.add(eyeBezel);
-
-  const eyeLens = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), lensMat);
-  eyeLens.rotation.x = -Math.PI / 2;
-  eyeLens.position.z = 0.045;
-  eye.add(eyeLens);
-
-  eye.position.set(e * 0.18, 0.12, 0.45);
-  opticsGroup.add(eye);
+// Hydraulic Manifolds & Orange Wiring
+for (let m = 0; m < 12; m++) {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3((Math.random() - 0.5) * 0.4, -0.05, 0.4 - m * 0.08),
+    new THREE.Vector3((Math.random() - 0.5) * 0.6, -0.15, 0.3 - m * 0.08),
+    new THREE.Vector3((Math.random() - 0.5) * 0.4, -0.08, 0.2 - m * 0.08)
+  ]);
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 10, 0.012, 6, false), m % 2 === 0 ? orangeMat : darkMechMat);
+  chassisGroup.add(tube);
 }
 
-// --- 3. 6-SEGMENT ARMORED STINGER TAIL ---
-const tailSegments = [];
-let prevTail = stingerGroup;
-stingerGroup.position.set(0, 0.08, -0.55);
+// --- 3. DUAL MASSIVE HYDRAULIC CHELAE (CLAWS / PINCERS) ---
+// Detailed with transparent glass canopy window showing internal orange gear trains!
+function createChela(isLeft) {
+  const chelaRoot = new THREE.Group();
+  const dir = isLeft ? -1 : 1;
+  chelaRoot.position.set(dir * 0.32, -0.02, 0.48);
 
-for (let s = 0; s < 6; s++) {
-  const segPivot = new THREE.Group();
-  segPivot.position.set(0, s === 0 ? 0 : 0.22, s === 0 ? 0 : -0.08);
+  // Shoulder rotary joint
+  const shoulder = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 20), orangeMat);
+  shoulder.rotation.z = Math.PI / 2;
+  chelaRoot.add(shoulder);
 
-  const segMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.12 - s * 0.015, 0.14 - s * 0.015, 0.24, 16),
-    whiteMat
-  );
-  segMesh.position.y = 0.11;
-  segMesh.castShadow = true;
-  segPivot.add(segMesh);
+  // Humerus Arm Strut
+  const humerusGroup = new THREE.Group();
+  humerusGroup.rotation.y = dir * 0.45;
+  chelaRoot.add(humerusGroup);
 
-  const joint = new THREE.Mesh(new THREE.TorusGeometry(0.13 - s * 0.015, 0.018, 10, 24), orangeMat);
-  joint.rotation.x = Math.PI / 2;
-  joint.position.y = 0.22;
-  segPivot.add(joint);
+  const humerusStrut = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.52), whiteShellMat);
+  humerusStrut.position.set(dir * 0.18, 0, 0.24);
+  humerusStrut.castShadow = true;
+  humerusGroup.add(humerusStrut);
 
-  prevTail.add(segPivot);
-  tailSegments.push(segPivot);
-  prevTail = segPivot;
+  // Elbow Rotary Hub
+  const elbowHub = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.14, 20), orangeMat);
+  elbowHub.position.set(dir * 0.36, 0, 0.5);
+  elbowHub.rotation.x = Math.PI / 2;
+  humerusGroup.add(elbowHub);
+
+  // Claw Forearm & Hand Pincer Pod
+  const clawForearm = new THREE.Group();
+  clawForearm.position.set(dir * 0.36, 0, 0.5);
+  clawForearm.rotation.y = -dir * 0.7;
+  humerusGroup.add(clawForearm);
+
+  // Heavy Armored White Hand Pod
+  const handPod = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.62), whiteShellMat);
+  handPod.position.set(dir * 0.08, 0, 0.32);
+  handPod.castShadow = true;
+  clawForearm.add(handPod);
+
+  // Transparent Glass Inspection Canopy Window on Hand Pod
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 0.26), glassMat);
+  canopy.position.set(dir * 0.08, 0.1, 0.28);
+  clawForearm.add(canopy);
+
+  // Internal Orange Gear Train inside the Claw!
+  const clawGear1 = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.03, 16), orangeMat);
+  clawGear1.position.set(dir * 0.08, 0.03, 0.22);
+  clawForearm.add(clawGear1);
+
+  const clawGear2 = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.03, 12), darkMechMat);
+  clawGear2.position.set(dir * 0.08, 0.03, 0.32);
+  clawForearm.add(clawGear2);
+
+  // Fixed Pincer Finger (Outer jaw)
+  const fixedJaw = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.38, 4), darkMechMat);
+  fixedJaw.rotation.x = -Math.PI / 2;
+  fixedJaw.rotation.y = dir * 0.2;
+  fixedJaw.position.set(dir * 0.14, 0, 0.78);
+  clawForearm.add(fixedJaw);
+
+  // Movable Thumb Pincer Jaw (Inner jaw - animates open/close!)
+  const movableJaw = new THREE.Group();
+  movableJaw.position.set(0, 0, 0.62);
+  clawForearm.add(movableJaw);
+
+  const movableTooth = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.36, 4), darkMechMat);
+  movableTooth.rotation.x = -Math.PI / 2;
+  movableTooth.rotation.y = -dir * 0.3;
+  movableTooth.position.set(0, 0, 0.18);
+  movableJaw.add(movableTooth);
+
+  return { root: chelaRoot, humerus: humerusGroup, forearm: clawForearm, jaw: movableJaw, dir };
 }
 
-// Stinger Bulb & Titanium Spur
-const stingerBulb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 16), whiteMat);
-stingerBulb.position.y = 0.22;
-stingerBulb.castShadow = true;
-prevTail.add(stingerBulb);
+const clawL = createChela(true);
+clawsGroup.add(clawL.root);
 
-const stingerCollar = new THREE.Mesh(new THREE.TorusGeometry(0.142, 0.02, 12, 24), orangeMat);
-stingerCollar.rotation.x = Math.PI / 2;
-stingerCollar.position.y = 0.22;
-prevTail.add(stingerCollar);
+const clawR = createChela(false);
+clawsGroup.add(clawR.root);
 
-const spurCurve = new THREE.CatmullRomCurve3([
-  new THREE.Vector3(0, 0.22, 0),
-  new THREE.Vector3(0, 0.35, 0.1),
-  new THREE.Vector3(0, 0.48, 0.28)
-]);
-const spurMesh = new THREE.Mesh(new THREE.TubeGeometry(spurCurve, 16, 0.025, 8, false), darkMechMat);
-prevTail.add(spurMesh);
-
-const spurTip = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.1, 16), orangeMat);
-spurTip.position.set(0, 0.52, 0.33);
-spurTip.rotation.x = Math.PI / 3;
-prevTail.add(spurTip);
-
-// --- 4. DUAL CHELAE (HYDRAULIC PINCERS) ---
-let clawFingersL, clawFingersR;
-
-function createChelae(isLeft) {
-  const root = new THREE.Group();
-  const side = isLeft ? -1 : 1;
-  root.position.set(side * 0.42, 0, 0.32);
-
-  const arm1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.38, 16), whiteMat);
-  arm1.rotation.z = side * 0.7;
-  arm1.rotation.y = side * 0.4;
-  arm1.position.set(side * 0.18, 0.05, 0.15);
-  arm1.castShadow = true;
-  root.add(arm1);
-
-  const arm2 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.35, 16), whiteMat);
-  arm2.rotation.z = -side * 0.5;
-  arm2.position.set(side * 0.34, 0.12, 0.38);
-  arm2.castShadow = true;
-  root.add(arm2);
-
-  const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), orangeMat);
-  elbow.position.set(side * 0.32, 0.1, 0.26);
-  root.add(elbow);
-
-  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.28), whiteMat);
-  palm.position.set(side * 0.42, 0.14, 0.58);
-  palm.castShadow = true;
-  root.add(palm);
-
-  const fingerFixed = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.26, 4), darkMechMat);
-  fingerFixed.rotation.x = Math.PI / 2;
-  fingerFixed.rotation.z = side * 0.2;
-  fingerFixed.position.set(side * 0.38, 0.14, 0.76);
-  root.add(fingerFixed);
-
-  const fingerMobile = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.26, 4), orangeMat);
-  fingerMobile.rotation.x = Math.PI / 2;
-  fingerMobile.rotation.z = -side * 0.3;
-  fingerMobile.position.set(side * 0.46, 0.14, 0.76);
-  root.add(fingerMobile);
-
-  if (isLeft) clawFingersL = fingerMobile;
-  else clawFingersR = fingerMobile;
-
-  return root;
-}
-
-const clawL = createChelae(true);
-chelaeLGroup.add(clawL);
-
-const clawR = createChelae(false);
-chelaeRGroup.add(clawR);
-
-// --- 5. 8 ARTICULATED WALKING LEGS ---
+// --- 4. 8 ARTICULATED WALKING LEGS (OCTOPOD WALKING GAIT) ---
+// Each leg: Coxa, Trochanter, Orange Knee Hub, Femur, Ankle, and Needle Stilt Foot
 const legs = [];
-for (let side = -1; side <= 1; side += 2) {
-  const isLeft = side < 0;
-  for (let idx = 0; idx < 4; idx++) {
-    const legRoot = new THREE.Group();
-    const legZ = 0.28 - idx * 0.24;
-    legRoot.position.set(side * 0.38, -0.05, legZ);
-    legsGroup.add(legRoot);
+const legConfigs = [
+  { id: 'L1', side: -1, z: 0.38, spreadY: 0.55,  femurLen: 0.68, tibLen: 0.88 },
+  { id: 'L2', side: -1, z: 0.12, spreadY: 0.18,  femurLen: 0.76, tibLen: 0.94 },
+  { id: 'L3', side: -1, z: -0.14, spreadY: -0.18, femurLen: 0.76, tibLen: 0.94 },
+  { id: 'L4', side: -1, z: -0.4,  spreadY: -0.55, femurLen: 0.68, tibLen: 0.88 },
+  { id: 'R1', side: 1,  z: 0.38, spreadY: -0.55, femurLen: 0.68, tibLen: 0.88 },
+  { id: 'R2', side: 1,  z: 0.12, spreadY: -0.18, femurLen: 0.76, tibLen: 0.94 },
+  { id: 'R3', side: 1,  z: -0.14, spreadY: 0.18,  femurLen: 0.76, tibLen: 0.94 },
+  { id: 'R4', side: 1,  z: -0.4,  spreadY: 0.55,  femurLen: 0.68, tibLen: 0.88 }
+];
 
-    const coxa = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.15, 12), orangeMat);
-    coxa.rotation.z = Math.PI / 2;
-    legRoot.add(coxa);
+legConfigs.forEach((cfg, idx) => {
+  const legRoot = new THREE.Group();
+  legRoot.position.set(cfg.side * 0.36, -0.06, cfg.z);
+  legRoot.rotation.y = cfg.spreadY;
+  legsGroup.add(legRoot);
 
-    const femurGroup = new THREE.Group();
-    femurGroup.position.set(side * 0.08, 0, 0);
-    legRoot.add(femurGroup);
+  // Coxa Socket
+  const coxa = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.12, 16), darkMechMat);
+  coxa.rotation.z = Math.PI / 2;
+  legRoot.add(coxa);
 
-    const femur = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.42, 12), whiteMat);
-    femur.position.set(side * 0.18, 0.1, 0);
-    femur.rotation.z = side * 0.65;
-    femur.castShadow = true;
-    femurGroup.add(femur);
+  // Trochanter Arm (Angles upward and outward)
+  const trochanter = new THREE.Group();
+  trochanter.rotation.z = -cfg.side * 0.85;
+  legRoot.add(trochanter);
 
-    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), darkMechMat);
-    knee.position.set(side * 0.34, 0.18, 0);
-    femurGroup.add(knee);
+  const trochanterStrut = new THREE.Mesh(new THREE.BoxGeometry(0.09, cfg.femurLen, 0.08), whiteShellMat);
+  trochanterStrut.position.y = cfg.femurLen / 2;
+  trochanterStrut.castShadow = true;
+  trochanter.add(trochanterStrut);
 
-    const tibiaGroup = new THREE.Group();
-    tibiaGroup.position.copy(knee.position);
-    femurGroup.add(tibiaGroup);
+  // Prominent Orange Knee Hub with Concentric Bolts (Matching docs/scorpion.gif!)
+  const kneeHub = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.1, 24), orangeMat);
+  kneeHub.position.y = cfg.femurLen;
+  kneeHub.rotation.x = Math.PI / 2;
+  trochanter.add(kneeHub);
 
-    const tibia = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.52, 12), whiteMat);
-    tibia.position.set(side * 0.12, -0.22, 0);
-    tibia.rotation.z = -side * 0.45;
-    tibia.castShadow = true;
-    tibiaGroup.add(tibia);
+  const kneeCenterCap = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.11, 16), darkMechMat);
+  kneeCenterCap.position.copy(kneeHub.position);
+  kneeCenterCap.rotation.copy(kneeHub.rotation);
+  trochanter.add(kneeCenterCap);
 
-    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), orangeMat);
-    foot.position.set(side * 0.22, -0.45, 0);
-    tibiaGroup.add(foot);
+  // Femur/Tibia Lower Leg (Angles sharply down to floor)
+  const tibia = new THREE.Group();
+  tibia.position.set(0, cfg.femurLen, 0);
+  tibia.rotation.z = cfg.side * 1.62;
+  trochanter.add(tibia);
 
-    legs.push({
-      id: `${isLeft ? 'L' : 'R'}${idx + 1}`,
-      root: legRoot,
-      femur: femurGroup,
-      tibia: tibiaGroup,
-      side,
-      phase: idx * 0.8 + (isLeft ? 0 : Math.PI)
-    });
-  }
+  const tibiaStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.038, cfg.tibLen, 14), whiteShellMat);
+  tibiaStrut.position.y = cfg.tibLen / 2;
+  tibiaStrut.castShadow = true;
+  tibia.add(tibiaStrut);
+
+  // Ankle Rotary Joint
+  const ankleJoint = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.06, 14), orangeMat);
+  ankleJoint.position.y = cfg.tibLen;
+  ankleJoint.rotation.x = Math.PI / 2;
+  tibia.add(ankleJoint);
+
+  // Sharp Needle Stilt Foot Point with Rubber Damper
+  const stiltFoot = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.22, 12), darkMechMat);
+  stiltFoot.position.y = cfg.tibLen + 0.11;
+  tibia.add(stiltFoot);
+
+  legs.push({
+    id: cfg.id,
+    root: legRoot,
+    trochanter,
+    tibia,
+    side: cfg.side,
+    gaitPhase: (idx % 2 === 0 ? 0 : Math.PI) + (idx >= 4 ? 0.6 : 0)
+  });
+});
+
+// --- 5. 5-LINK ARCHED HYDRAULIC STINGER TAIL (STRIKE KINEMATICS!) ---
+tailGroup.position.set(0, 0.14, -0.62);
+
+const tailSegments = [];
+const numTailLinks = 5;
+let prevTailParent = tailGroup;
+
+for (let t = 0; t < numTailLinks; t++) {
+  const linkGroup = new THREE.Group();
+  const linkLen = 0.42 * Math.pow(0.94, t);
+  linkGroup.position.z = t === 0 ? 0 : -linkLen;
+
+  // Initial resting arch: curves upward and forward over the body!
+  linkGroup.rotation.x = 0.42;
+
+  // White Box Armor Link
+  const linkMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34 * Math.pow(0.92, t), 0.26 * Math.pow(0.92, t), linkLen), whiteShellMat);
+  linkMesh.position.z = -linkLen / 2;
+  linkMesh.castShadow = true;
+  linkGroup.add(linkMesh);
+
+  // Lateral Double Orange Rotary Discs on both sides of each link!
+  [-1, 1].forEach(side => {
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 20), orangeMat);
+    disc.position.set(side * 0.18 * Math.pow(0.92, t), 0, -linkLen / 2);
+    disc.rotation.z = Math.PI / 2;
+    linkGroup.add(disc);
+
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 14), darkMechMat);
+    axle.position.copy(disc.position);
+    axle.rotation.copy(disc.rotation);
+    linkGroup.add(axle);
+  });
+
+  prevTailParent.add(linkGroup);
+  tailSegments.push(linkGroup);
+  prevTailParent = linkGroup;
 }
+
+// Terminal Telson Venom Bulb & Curved Stinger Blade
+const telsonBulb = new THREE.Group();
+telsonBulb.position.set(0, 0, -0.38);
+prevTailParent.add(telsonBulb);
+
+const bulbMesh = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 20), whiteShellMat);
+bulbMesh.scale.set(0.9, 0.9, 1.4);
+bulbMesh.castShadow = true;
+telsonBulb.add(bulbMesh);
+
+const bulbOrangeBand = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.02, 12, 28), orangeMat);
+telsonBulb.add(bulbOrangeBand);
+
+// Sharp Curved Stinger Blade (Black titanium with orange heated cutting spur)
+const stingerCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0, 0, -0.2),
+  new THREE.Vector3(0, 0.12, -0.42),
+  new THREE.Vector3(0, 0.38, -0.58)
+]);
+const stingerBlade = new THREE.Mesh(new THREE.TubeGeometry(stingerCurve, 20, 0.025, 8, false), darkMechMat);
+telsonBulb.add(stingerBlade);
+
+const stingerSpur = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.16, 12), orangeMat);
+stingerSpur.position.set(0, 0.38, -0.58);
+stingerSpur.rotation.x = 0.6;
+telsonBulb.add(stingerSpur);
 
 // =========================================================================
 // CALLOUT LABELS & LEADER LINES
 // =========================================================================
 
 const calloutDefs = [
-  { id: 'spur', text: 'TITANIUM SPUR', sub: 'PUNCTURE TIP · ARMED', getPos: () => spurTip.getWorldPosition(new THREE.Vector3()) },
-  { id: 'stinger_bulb', text: 'STINGER BULB', sub: 'HYDRAULIC RESERVOIR', getPos: () => stingerBulb.getWorldPosition(new THREE.Vector3()) },
-  { id: 'carapace', text: 'CARAPACE DORSAL', sub: '5 ARMOR TIERS', getPos: () => carapacePlates[1].getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.15, 0)) },
-  { id: 'chelae', text: 'CHELAE CLAW', sub: 'DUAL 3-AXIS PINCER', getPos: () => clawR.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.3, 0.1, 0.4)) },
-  { id: 'leg', text: 'WALKING LEG R2', sub: '3 DOF HIGH-TORQUE SERVO', getPos: () => legs[5].femur.getWorldPosition(new THREE.Vector3()) },
-  { id: 'optics', text: 'STEREO OPTICS', sub: 'TRIPLE HIGH-RES SENSOR', getPos: () => opticsGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.1, 0.4)) }
+  { id: 'sensor_head', text: 'SENSOR HEAD', sub: '2 MEDIAN · 4 LATERAL OPTICS', getPos: () => headGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.1, 0.2)) },
+  { id: 'claw_drives', text: 'CLAW DRIVES', sub: '2 CHELAE · 4-GEAR TRAINS', getPos: () => clawL.forearm.getWorldPosition(new THREE.Vector3()) },
+  { id: 'carapace', text: 'CARAPACE CORE', sub: '5 PLATES · GLASS CANOPY', getPos: () => carapacePlates[2].getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.1, 0)) },
+  { id: 'tail_act', text: 'TAIL ACTUATORS', sub: '5 LINKS · 8 SERVOS', getPos: () => tailSegments[2].getWorldPosition(new THREE.Vector3()) },
+  { id: 'stinger', text: 'STINGER BLADE', sub: 'HIGH-VELOCITY HYDRAULIC SPUR', getPos: () => telsonBulb.getWorldPosition(new THREE.Vector3()) },
+  { id: 'leg_servos', text: 'OCTOPOD GAIT', sub: '8 LEGS · 4 JOINTS', getPos: () => legs[1].root.getWorldPosition(new THREE.Vector3()) }
 ];
 
 const domLabels = [];
@@ -870,7 +976,7 @@ calloutDefs.forEach(def => {
 });
 
 // =========================================================================
-// INTERACTION LOGIC
+// INTERACTIVE CONTROLS & CAMERA SYSTEM
 // =========================================================================
 
 let currentAssembly = 'hero';
@@ -878,14 +984,15 @@ let showLabels = true;
 let isExploded = false;
 let isTurntable = false;
 let isPlaying = true;
-let strikeTriggered = false;
-let strikeTimer = 0;
+let isWalking = false;
+let isStriking = false;
+let strikeProgress = 0;
 
 let explodedFactor = 0;
 
 let camLookAt = new THREE.Vector3(0, 0, 0);
 let currentLookAt = new THREE.Vector3(0, 0, 0);
-let spherical = new THREE.Spherical(5.2, Math.PI / 2.6, 0.85);
+let spherical = new THREE.Spherical(5.6, Math.PI / 2.7, 0.85);
 
 let isPointerDown = false;
 let prevPointerX = 0;
@@ -898,11 +1005,6 @@ canvas.addEventListener('pointerdown', (e) => {
   canvas.classList.add('grabbing');
 });
 
-window.addEventListener('pointerup', () => {
-  isPointerDown = false;
-  canvas.classList.remove('grabbing');
-});
-
 window.addEventListener('pointermove', (e) => {
   if (!isPointerDown) return;
   const dx = e.clientX - prevPointerX;
@@ -910,27 +1012,25 @@ window.addEventListener('pointermove', (e) => {
   prevPointerX = e.clientX;
   prevPointerY = e.clientY;
 
-  spherical.theta -= dx * 0.007;
-  spherical.phi -= dy * 0.007;
-  spherical.phi = Math.max(0.1, Math.min(Math.PI / 2 - 0.05, spherical.phi));
-  
-  if (isTurntable) {
-    isTurntable = false;
-    document.getElementById('btn-turntable').classList.remove('active');
-  }
+  spherical.theta -= dx * 0.006;
+  spherical.phi = Math.max(0.1, Math.min(Math.PI / 2 - 0.02, spherical.phi - dy * 0.006));
+});
+
+window.addEventListener('pointerup', () => {
+  isPointerDown = false;
+  canvas.classList.remove('grabbing');
 });
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  spherical.radius += e.deltaY * 0.004;
-  spherical.radius = Math.max(2.0, Math.min(9.5, spherical.radius));
+  spherical.radius = Math.max(2.2, Math.min(9.5, spherical.radius + e.deltaY * 0.004));
 }, { passive: false });
 
-// Assembly buttons
-const assemblyButtons = document.querySelectorAll('[data-assembly]');
-assemblyButtons.forEach(btn => {
+// Assembly Selector Buttons
+const assemblyBtns = document.querySelectorAll('[data-assembly]');
+assemblyBtns.forEach(btn => {
   btn.addEventListener('click', () => {
-    assemblyButtons.forEach(b => b.classList.remove('active'));
+    assemblyBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     setAssemblyMode(btn.dataset.assembly);
   });
@@ -944,56 +1044,61 @@ function setAssemblyMode(mode) {
   const statusText = document.getElementById('val-status-text');
 
   if (mode === 'hero') {
-    titleEl.textContent = 'STRIKE ARMED';
-    descEl.textContent = 'HEXAPOD WAVE GAIT · 18.5 CM CLEARANCE';
-    statusText.textContent = 'STRIKE ARMED';
+    titleEl.textContent = 'STANDING';
+    descEl.textContent = 'CLAW L · 0% APART';
+    statusText.textContent = 'STANDING';
     statusBadge.className = 'status-badge';
-    spherical.radius = 5.2;
-    spherical.phi = Math.PI / 2.6;
+    spherical.radius = 5.6;
+    spherical.phi = Math.PI / 2.7;
     camLookAt.set(0, 0, 0);
-  } else if (mode === 'stinger') {
-    titleEl.textContent = 'STINGER TAIL';
-    descEl.textContent = 'TITANIUM SPUR · HYDRAULIC ELEVATION';
-    statusText.textContent = 'STINGER';
-    statusBadge.className = 'status-badge orange';
-    spherical.radius = 3.2;
-    spherical.phi = Math.PI / 3.0;
-    spherical.theta = Math.PI * 0.8;
-    camLookAt.set(0, 0.4, -0.3);
-  } else if (mode === 'chelae') {
-    titleEl.textContent = 'CHELAE CLAWS';
-    descEl.textContent = 'DUAL 3-AXIS HYDRAULIC PINCERS';
-    statusText.textContent = 'CHELAE';
+    isStriking = false;
+  } else if (mode === 'claw') {
+    titleEl.textContent = 'CLAW DRIVES';
+    descEl.textContent = 'CHELAE · 4-GEAR TRAINS';
+    statusText.textContent = 'CLAW L';
     statusBadge.className = 'status-badge';
-    spherical.radius = 3.2;
-    spherical.phi = Math.PI / 2.4;
-    spherical.theta = 0.2;
-    camLookAt.set(0, 0.1, 0.5);
-  } else if (mode === 'carapace') {
-    titleEl.textContent = 'CARAPACE DORSAL';
-    descEl.textContent = '5 ARTICULATED CERAMIC ARMOR PLATES';
-    statusText.textContent = 'CARAPACE';
+    spherical.radius = 2.8;
+    spherical.phi = Math.PI / 2.6;
+    camLookAt.set(-0.65, 0, 0.65);
+    isStriking = false;
+  } else if (mode === 'tail') {
+    titleEl.textContent = 'TAIL ACTUATORS';
+    descEl.textContent = '5 LINKS · 8 SERVOS';
+    statusText.textContent = 'TAIL';
     statusBadge.className = 'status-badge';
     spherical.radius = 3.6;
-    spherical.phi = Math.PI / 4.0;
-    camLookAt.set(0, 0.1, 0);
-  } else if (mode === 'legs') {
-    titleEl.textContent = 'WALKING GEAR';
-    descEl.textContent = '8 HIGH-TORQUE SERVO ACTUATORS';
-    statusText.textContent = 'LEGS';
+    spherical.phi = Math.PI / 3.0;
+    camLookAt.set(0, 0.6, -0.4);
+    isStriking = false;
+  } else if (mode === 'leg') {
+    titleEl.textContent = 'LEG SERVOS';
+    descEl.textContent = 'OCTOPOD WAVE GAIT';
+    statusText.textContent = 'LEG L2';
     statusBadge.className = 'status-badge';
-    spherical.radius = 4.2;
+    spherical.radius = 2.8;
     spherical.phi = Math.PI / 2.2;
-    camLookAt.set(0, -0.2, 0);
-  } else if (mode === 'optics') {
-    titleEl.textContent = 'STEREO OPTICS';
-    descEl.textContent = 'TRIPLE SENSOR · TARGETING TRACKER';
-    statusText.textContent = 'OPTICS';
+    camLookAt.set(-0.45, -0.2, 0.1);
+    isStriking = false;
+  } else if (mode === 'carapace') {
+    titleEl.textContent = 'CARAPACE CORE';
+    descEl.textContent = '5 PLATES · RIVETED';
+    statusText.textContent = 'CARAPACE';
     statusBadge.className = 'status-badge';
-    spherical.radius = 2.4;
-    spherical.phi = Math.PI / 2.3;
-    spherical.theta = 0;
-    camLookAt.set(0, 0.12, 0.45);
+    spherical.radius = 3.2;
+    spherical.phi = Math.PI / 3.2;
+    camLookAt.set(0, 0.2, 0);
+    isStriking = false;
+  } else if (mode === 'strike') {
+    titleEl.textContent = 'TAIL STRIKE';
+    descEl.textContent = 'HIGH-SPEED SNAP · 140°';
+    statusText.textContent = 'STRIKE';
+    statusBadge.className = 'status-badge orange';
+    document.getElementById('tag-blade').textContent = 'ACTIVE';
+    document.getElementById('timeline-operator-text').textContent = 'OPERATOR · TAIL STRIKE';
+    spherical.radius = 4.8;
+    spherical.phi = Math.PI / 2.8;
+    camLookAt.set(0, 0.3, 0.2);
+    isStriking = true;
   }
 }
 
@@ -1008,11 +1113,9 @@ const btnExploded = document.getElementById('btn-exploded');
 btnExploded.addEventListener('click', () => {
   isExploded = !isExploded;
   btnExploded.classList.toggle('active', isExploded);
-  const titleEl = document.getElementById('mode-title');
-  const descEl = document.getElementById('mode-desc');
   if (isExploded) {
-    titleEl.textContent = 'TEARDOWN';
-    descEl.textContent = 'TURNTABLE 98° · 100% APART';
+    document.getElementById('mode-title').textContent = 'TEARDOWN';
+    document.getElementById('mode-desc').textContent = 'TURNTABLE · 100% APART';
     document.getElementById('val-status-text').textContent = 'TEARDOWN';
     document.getElementById('val-status').className = 'status-badge orange';
   } else {
@@ -1020,22 +1123,18 @@ btnExploded.addEventListener('click', () => {
   }
 });
 
+const btnWalk = document.getElementById('btn-walk');
+btnWalk.addEventListener('click', () => {
+  isWalking = !isWalking;
+  btnWalk.classList.toggle('active', isWalking);
+  document.getElementById('val-gait').textContent = isWalking ? '1.2' : '0.0';
+  document.getElementById('val-speed').textContent = isWalking ? '48 MM/S' : '0 MM/S';
+});
+
 const btnTurntable = document.getElementById('btn-turntable');
 btnTurntable.addEventListener('click', () => {
   isTurntable = !isTurntable;
   btnTurntable.classList.toggle('active', isTurntable);
-});
-
-const btnStrike = document.getElementById('btn-strike');
-btnStrike.addEventListener('click', () => {
-  strikeTriggered = true;
-  strikeTimer = 0;
-  document.getElementById('val-force').textContent = '480';
-  document.getElementById('val-vel').textContent = '14.8';
-  setTimeout(() => {
-    document.getElementById('val-force').textContent = '320';
-    document.getElementById('val-vel').textContent = '7.2';
-  }, 1000);
 });
 
 const btnPlay = document.getElementById('btn-play');
@@ -1046,45 +1145,58 @@ btnPlay.addEventListener('click', () => {
     '<path d="M8 5v14l11-7z"/>';
 });
 
-// Wave Canvas
-const stingerCanvas = document.getElementById('stinger-canvas');
-const stingerCtx = stingerCanvas.getContext('2d');
-let waveOffset = 0;
+// Gait Wave Canvas
+const gaitCanvas = document.getElementById('gait-canvas');
+const gaitCtx = gaitCanvas.getContext('2d');
+let gaitOffset = 0;
 
-function drawStingerWave(time) {
-  stingerCtx.clearRect(0, 0, stingerCanvas.width, stingerCanvas.height);
-  stingerCtx.strokeStyle = '#e8e5de';
-  stingerCtx.lineWidth = 1;
-  stingerCtx.beginPath();
-  stingerCtx.moveTo(0, stingerCanvas.height / 2);
-  stingerCtx.lineTo(stingerCanvas.width, stingerCanvas.height / 2);
-  stingerCtx.stroke();
+function drawGaitWave(time) {
+  gaitCtx.clearRect(0, 0, gaitCanvas.width, gaitCanvas.height);
 
-  stingerCtx.strokeStyle = '#ff4800';
-  stingerCtx.lineWidth = 1.8;
-  stingerCtx.beginPath();
+  // Draw 8-leg step stance bars matching docs/scorpion_f0.png!
+  const w = gaitCanvas.width;
+  const h = gaitCanvas.height;
+  const barH = 3;
 
-  const w = stingerCanvas.width;
-  const h = stingerCanvas.height;
-  const mid = h / 2;
-  const amp = strikeTriggered ? 16 : (isPlaying ? 8 : 2);
+  for (let l = 0; l < 8; l++) {
+    const y = 3 + l * 4.8;
+    gaitCtx.fillStyle = '#e8e4dc';
+    gaitCtx.fillRect(0, y, w, barH);
 
-  for (let x = 0; x < w; x++) {
-    const progress = x / w;
-    const envelope = Math.sin(progress * Math.PI);
-    const y = mid - Math.sin((x * 0.1) - waveOffset) * amp * envelope;
-    if (x === 0) stingerCtx.moveTo(x, y);
-    else stingerCtx.lineTo(x, y);
+    // Stride bars
+    for (let b = 0; b < 6; b++) {
+      const bx = ((b * 32 + (isWalking ? gaitOffset * 18 : 0) + (l % 2 === 0 ? 0 : 16)) % w);
+      gaitCtx.fillStyle = '#ff4800';
+      gaitCtx.fillRect(bx, y, 14, barH);
+    }
   }
-  stingerCtx.stroke();
+}
+
+// Claw Grip Canvas
+const gripCanvas = document.getElementById('grip-canvas');
+const gripCtx = gripCanvas.getContext('2d');
+
+function drawGripGraph(time) {
+  gripCtx.clearRect(0, 0, gripCanvas.width, gripCanvas.height);
+  gripCtx.strokeStyle = '#ff4800';
+  gripCtx.lineWidth = 1.5;
+  gripCtx.beginPath();
+  const w = gripCanvas.width;
+  const h = gripCanvas.height;
+  for (let x = 0; x < w; x++) {
+    const y = h - 4 - Math.sin((x * 0.1) + time * 3) * 8;
+    if (x === 0) gripCtx.moveTo(x, y);
+    else gripCtx.lineTo(x, y);
+  }
+  gripCtx.stroke();
 }
 
 // =========================================================================
-// ANIMATION LOOP
+// MAIN ANIMATION LOOP & KINEMATICS
 // =========================================================================
 
 let clock = new THREE.Clock();
-let elapsedSimTime = 14 * 60 + 32;
+let elapsedSimTime = 3;
 
 function animate() {
   requestAnimationFrame(animate);
@@ -1093,10 +1205,10 @@ function animate() {
   const time = clock.getElapsedTime();
 
   if (isPlaying) {
-    waveOffset += delta * 5;
+    gaitOffset += delta * 2.5;
     elapsedSimTime += delta;
     if (isTurntable) {
-      spherical.theta += delta * 0.35;
+      spherical.theta += delta * 0.32;
     }
   }
 
@@ -1106,59 +1218,69 @@ function animate() {
   currentLookAt.lerp(camLookAt, 0.08);
   camera.lookAt(currentLookAt);
 
+  // Exploded interpolation
   const targetExploded = isExploded ? 1.0 : 0.0;
   explodedFactor += (targetExploded - explodedFactor) * 0.08;
 
-  orbitRingsGroup.visible = (explodedFactor > 0.05);
-
-  // --- 1. CARAPACE PLATES DISPLACEMENT ---
+  // 1. CARAPACE & CHASSIS EXPLODED DISPLACEMENTS
   carapacePlates.forEach((plate, idx) => {
-    plate.position.y = (0.06 + idx * 0.03) + (explodedFactor * (0.2 + idx * 0.12));
+    plate.position.y = (4 - idx) * 0.03 + explodedFactor * (0.35 + idx * 0.1);
+  });
+  headGroup.position.set(0, 0.08 + explodedFactor * 0.25, 0.62 + explodedFactor * 0.55);
+  clawsGroup.position.set(0, -explodedFactor * 0.15, explodedFactor * 0.35);
+
+  // 2. CLAW PINCERS GRIP ANIMATION
+  const gripAngle = 0.12 + (isPlaying ? Math.sin(time * 3.5) * 0.1 : 0);
+  clawL.jaw.rotation.y = clawL.dir * gripAngle;
+  clawR.jaw.rotation.y = clawR.dir * gripAngle;
+
+  // Update Claw Grip UI
+  const gripN = (19 + Math.abs(Math.sin(time * 3.5)) * 33).toFixed(0);
+  const gripEl = document.getElementById('val-grip');
+  if (gripEl) gripEl.textContent = gripN;
+
+  // 3. 8-LEGGED OCTOPOD WALKING GAIT
+  legs.forEach(leg => {
+    if (isWalking && isPlaying) {
+      const phase = gaitOffset * Math.PI * 2 + leg.gaitPhase;
+      const stepLift = Math.max(0, Math.sin(phase)) * 0.15;
+      const stepSwing = Math.cos(phase) * 0.18;
+
+      leg.root.position.y = -0.06 + stepLift;
+      leg.root.rotation.y = leg.root.rotation.y + stepSwing * 0.05;
+      leg.trochanter.rotation.z = -leg.side * (0.85 + stepLift * 0.6);
+      leg.tibia.rotation.z = leg.side * (1.62 - stepLift * 0.8);
+    } else {
+      leg.root.position.y = -0.06 - explodedFactor * 0.25;
+      leg.root.position.x = leg.side * (0.36 + explodedFactor * 0.45);
+    }
   });
 
-  // --- 2. STINGER TAIL ARCH & STRIKE DYNAMICS ---
-  let strikeAngle = 0;
-  if (strikeTriggered) {
-    strikeTimer += delta * 5;
-    strikeAngle = Math.sin(strikeTimer * Math.PI) * 0.55;
-    if (strikeTimer >= 1.0) strikeTriggered = false;
+  // 4. TAIL ARCH & HIGH-SPEED STRIKE KINEMATICS
+  if (isStriking && isPlaying) {
+    strikeProgress += delta * 4.5;
+    const snap = Math.sin(strikeProgress);
+    const strikeArch = 0.42 + Math.max(0, snap) * 0.55;
+
+    tailSegments.forEach(seg => {
+      seg.rotation.x = strikeArch;
+    });
+
+    const strikeDeg = Math.floor(100 + Math.max(0, snap) * 40);
+    document.getElementById('val-strike').textContent = String(strikeDeg);
+    const needle = document.getElementById('strike-needle');
+    if (needle) needle.style.transform = `rotate(${strikeDeg}deg)`;
+  } else {
+    tailSegments.forEach((seg, idx) => {
+      seg.rotation.x = 0.42 + explodedFactor * (0.15 + idx * 0.08);
+      seg.position.z = -0.42 * (1 + explodedFactor * 0.65);
+    });
   }
 
-  tailSegments.forEach((seg, sIdx) => {
-    const naturalArch = 0.28 + Math.sin(time * 1.5 + sIdx * 0.4) * 0.04;
-    const arch = naturalArch + strikeAngle;
-    seg.rotation.x = arch;
-  });
-
-  stingerGroup.position.y = 0.08 + (explodedFactor * 0.4);
-  stingerGroup.position.z = -0.55 - (explodedFactor * 0.35);
-
-  // --- 3. DUAL CHELAE PINCERS ANIMATION ---
-  const snapL = Math.sin(time * 3) * 0.15;
-  const snapR = Math.cos(time * 3) * 0.15;
-  if (clawFingersL) clawFingersL.rotation.z = -0.3 + (isPlaying ? snapL : 0);
-  if (clawFingersR) clawFingersR.rotation.z = 0.3 - (isPlaying ? snapR : 0);
-
-  chelaeLGroup.position.x = -explodedFactor * 0.4;
-  chelaeRGroup.position.x = explodedFactor * 0.4;
-
-  // --- 4. 8 LEGS TRIPOD / WAVE GAIT ---
-  legs.forEach(leg => {
-    const wave = Math.sin(time * 4 + leg.phase);
-    const lift = Math.max(0, wave);
-    
-    if (isPlaying) {
-      leg.femur.rotation.z = leg.side * (0.65 + wave * 0.12);
-      leg.femur.position.y = lift * 0.08;
-      leg.tibia.rotation.z = -leg.side * (0.45 + wave * 0.09);
-    }
-
-    leg.root.position.x = leg.side * (0.38 + explodedFactor * 0.35);
-  });
-
-  // Screen Labels
+  // UI & HUD Updates
   renderScreenLabels();
-  drawStingerWave(time);
+  drawGaitWave(time);
+  drawGripGraph(time);
   updateTelemetryUI(time);
 
   renderer.render(scene, camera);
@@ -1174,68 +1296,41 @@ function renderScreenLabels() {
   const w = labelsCanvas.width;
   const h = labelsCanvas.height;
 
-  domLabels.forEach(item => {
-    const pos3D = item.def.getPos();
-    const screenPos = pos3D.clone().project(camera);
+  domLabels.forEach(({ def, el }) => {
+    const pos3D = def.getPos();
+    const p = pos3D.clone().project(camera);
 
-    if (screenPos.z > 1.0) {
-      item.el.style.opacity = '0';
+    if (p.z > 1.0) {
+      el.style.opacity = '0';
       return;
     }
 
-    const x = (screenPos.x * 0.5 + 0.5) * w;
-    const y = (-screenPos.y * 0.5 + 0.5) * h;
+    const sx = (p.x * 0.5 + 0.5) * w;
+    const sy = (-p.y * 0.5 + 0.5) * h;
 
-    const offsetX = screenPos.x > 0 ? 55 : -140;
-    const offsetY = screenPos.y > 0 ? -35 : 35;
-    const labelX = x + offsetX;
-    const labelY = y + offsetY;
+    el.style.left = `${sx}px`;
+    el.style.top = `${sy}px`;
+    el.style.opacity = '1';
 
-    item.el.style.left = `${labelX}px`;
-    item.el.style.top = `${labelY}px`;
-    item.el.style.opacity = '1';
-
-    labelsCtx.strokeStyle = 'rgba(255, 72, 0, 0.65)';
+    labelsCtx.strokeStyle = 'rgba(255, 72, 0, 0.4)';
     labelsCtx.lineWidth = 1.2;
-    labelsCtx.setLineDash([2, 2]);
-
     labelsCtx.beginPath();
-    labelsCtx.arc(x, y, 2.5, 0, Math.PI * 2);
+    labelsCtx.arc(sx, sy, 3, 0, Math.PI * 2);
     labelsCtx.fillStyle = '#ff4800';
     labelsCtx.fill();
 
-    labelsCtx.beginPath();
-    labelsCtx.moveTo(x, y);
-    labelsCtx.lineTo(labelX + (screenPos.x > 0 ? 0 : 80), labelY);
+    labelsCtx.moveTo(sx, sy);
+    labelsCtx.lineTo(sx + 10, sy);
     labelsCtx.stroke();
-    labelsCtx.setLineDash([]);
   });
 }
 
 function updateTelemetryUI(time) {
-  const totalSecs = Math.floor(elapsedSimTime);
-  const hrs = String(Math.floor(totalSecs / 3600)).padStart(2, '0');
-  const mins = String(Math.floor((totalSecs % 3600) / 60)).padStart(2, '0');
-  const secs = String(totalSecs % 60).padStart(2, '0');
-  document.getElementById('val-runtime').textContent = `${hrs}:${mins}:${secs}`;
-  document.getElementById('timeline-time').textContent = `${mins}:${secs} / 00:30`;
-
-  const pitchAngle = Math.sin(time * 0.8) * 1.5;
-  const rollAngle = Math.cos(time * 0.6) * 1.2;
-  const gimbalLine = document.getElementById('gimbal-line');
-  gimbalLine.style.transform = `translateY(${pitchAngle * 1.5}px) rotate(${rollAngle}deg)`;
-  document.getElementById('val-pitch').textContent = `${pitchAngle >= 0 ? '+' : ''}${pitchAngle.toFixed(2)}°`;
-  document.getElementById('val-roll').textContent = `${rollAngle >= 0 ? '+' : ''}${rollAngle.toFixed(2)}°`;
-
-  document.getElementById('val-draw').textContent = `${(44.0 + Math.sin(time) * 6.5).toFixed(1)} W`;
-
-  legData.forEach(item => {
-    const valEl = document.getElementById(`servo-val-${item.id}`);
-    const fillEl = document.getElementById(`servo-fill-${item.id}`);
-    const dynamicVal = Math.min(100, Math.max(20, Math.round(item.val + Math.sin(time * 2.5 + item.val) * 12)));
-    valEl.textContent = `${dynamicVal}%`;
-    fillEl.style.width = `${dynamicVal}%`;
-  });
+  const totalSec = Math.floor(elapsedSimTime);
+  const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+  const s = String(totalSec % 60).padStart(2, '0');
+  document.getElementById('val-runtime').textContent = `00:${m}:${s}`;
+  document.getElementById('timeline-time').textContent = `00:${s} / 00:26`;
 }
 
-animate();
+requestAnimationFrame(animate);

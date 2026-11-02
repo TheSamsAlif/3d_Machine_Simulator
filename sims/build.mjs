@@ -147,3 +147,11 @@ if (fs.existsSync(portalSrc)) {
   console.log(`${portalDist}  (Portal Showcase)`);
 }
 
+const docsSrc = path.join(HERE, '../docs');
+if (fs.existsSync(docsSrc)) {
+  const docsDist = path.join(DIST, 'docs');
+  fs.cpSync(docsSrc, docsDist, {recursive: true});
+  console.log(`${docsDist}  (Docs Showcase Media)`);
+}
+
+

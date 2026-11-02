@@ -2,8 +2,8 @@ import * as THREE from 'three';
 
 // =========================================================================
 // MELLIS HB-7 · ROBOTIC POLLINATOR MICRO AIR VEHICLE
-// FIELD SIMULATOR & 3D TEARDOWN
-// Exact match to user lab console screenshots (Images 1 & 2)
+// FIELD SIMULATOR & PRECISION 3D TEARDOWN
+// Exact 1:1 recreation of reference engineering lab console (Images 1 & 2)
 // =========================================================================
 
 const app = document.getElementById('app');
@@ -31,6 +31,7 @@ style.textContent = `
   #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; }
   #gl { width: 100%; height: 100%; display: block; cursor: grab; }
   #gl.grabbing { cursor: grabbing; }
+  #labels-canvas { position: absolute; inset: 0; pointer-events: none; width: 100%; height: 100%; z-index: 10; }
 
   /* UI Layer */
   #hud-layer { position: absolute; inset: 0; pointer-events: none; z-index: 20; padding: 18px 24px; display: flex; flex-direction: column; justify-content: space-between; }
@@ -120,97 +121,92 @@ style.textContent = `
     border-color: var(--accent-orange);
   }
 
-  /* Attitude Horizon */
-  .gimbal-box { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .gimbal-circle { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border-line); background: #eeebe3; position: relative; overflow: hidden; }
-  .gimbal-horizon { position: absolute; left: -10px; right: -10px; top: 50%; height: 1.5px; background: var(--accent-orange); transform-origin: center; }
-  .gimbal-sub { flex: 1; display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace; }
-  .gimbal-row { display: flex; justify-content: space-between; font-size: 8.5px; }
-  .gimbal-lbl { color: var(--text-muted); }
-  .gimbal-val { font-weight: 700; color: var(--text-dark); }
+  /* Attitude Indicator */
+  .horizon-wrapper { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+  .horizon-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #edeae2;
+    border: 1px solid var(--border-line);
+    position: relative;
+    overflow: hidden;
+  }
+  .horizon-sky { position: absolute; inset: 0; background: #f0ece3; }
+  .horizon-line { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: var(--accent-orange); transform-origin: center; }
+  .horizon-stats { display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace; font-size: 9px; }
+  .h-stat { display: flex; justify-content: space-between; gap: 10px; }
+  .h-lbl { color: var(--text-muted); font-size: 8px; }
+  .h-num { font-weight: 700; color: var(--text-dark); }
 
-  /* Subsystems */
-  .subsys-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dotted var(--border-line); font-family: 'JetBrains Mono', monospace; font-size: 8px; }
+  /* Subsystems List */
+  .subsys-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0ede6; }
   .subsys-item:last-child { border-bottom: none; }
-  .subsys-left { display: flex; flex-direction: column; }
-  .subsys-name { font-weight: 700; color: var(--text-dark); text-transform: uppercase; }
-  .subsys-desc { color: var(--text-muted); font-size: 7px; }
-  .subsys-tag { font-size: 7.5px; font-weight: 700; padding: 2px 5px; border-radius: 2px; }
+  .subsys-left { display: flex; flex-direction: column; gap: 1px; }
+  .subsys-name { font-size: 8.5px; font-weight: 700; color: var(--text-dark); font-family: 'JetBrains Mono', monospace; }
+  .subsys-desc { font-size: 7.5px; color: var(--text-muted); }
+  .subsys-tag { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 1px 6px; border-radius: 2px; }
   .subsys-tag.green { background: var(--accent-green-bg); color: var(--accent-green); }
   .subsys-tag.orange { background: var(--accent-orange-bg); color: var(--accent-orange); }
 
-  /* Operating Mode Center Title */
-  .flight-mode-anchor { position: absolute; left: 24px; bottom: 84px; pointer-events: none; }
-  .flight-mode-tag { font-size: 8.5px; font-weight: 700; letter-spacing: 1.4px; color: var(--text-muted); text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
-  .flight-mode-title { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent-orange); line-height: 1; margin: 3px 0; }
-  .flight-mode-sub { font-size: 9px; font-weight: 600; letter-spacing: 1.2px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; }
+  /* Center Bottom Status Overlay */
+  .flight-mode-tag {
+    position: absolute;
+    left: 270px;
+    bottom: 96px;
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+  }
+  .flight-mode-sub { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+  .flight-mode-big { font-size: 26px; font-weight: 800; color: var(--accent-orange); letter-spacing: -0.5px; line-height: 1.1; }
+  .flight-mode-spec { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; color: var(--text-muted); text-transform: uppercase; margin-top: 3px; letter-spacing: 0.5px; }
 
-  /* Bottom Bar */
-  .bottom-bar { display: flex; align-items: center; gap: 16px; background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 8px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); pointer-events: auto; }
-  .play-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-orange); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.1s; }
-  .play-btn:active { transform: scale(0.95); }
+  /* Bottom Timeline Bar */
+  .bottom-bar { background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 8px 18px; display: flex; align-items: center; gap: 18px; pointer-events: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+  .play-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--accent-orange); border: none; cursor: pointer; display: grid; place-items: center; color: #fff; flex-shrink: 0; box-shadow: 0 2px 6px rgba(255, 72, 0, 0.3); }
   .play-btn svg { width: 14px; height: 14px; fill: currentColor; }
-  .timeline-track { flex: 1; height: 3px; background: #e3dfd7; border-radius: 2px; position: relative; display: flex; align-items: center; cursor: pointer; }
-  .timeline-progress { height: 100%; background: var(--accent-orange); border-radius: 2px; width: 66%; }
-  .timeline-thumb { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--accent-orange); position: absolute; left: 66%; transform: translateX(-50%); }
-  .timeline-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8.5px; color: var(--text-muted); }
+  .timeline-track { flex: 1; height: 5px; background: #e5e1d7; border-radius: 2px; position: relative; cursor: pointer; }
+  .timeline-progress { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-orange); border-radius: 2px; width: 85%; }
+  .timeline-thumb { position: absolute; left: 85%; top: 50%; width: 12px; height: 12px; background: #fff; border: 2.5px solid var(--accent-orange); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+  .timeline-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); }
 
-  /* 3D Callouts */
-  #labels-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 15; width: 100%; height: 100%; }
+  /* Screen Space Callout Labels */
   .dom-label {
     position: absolute;
-    transform: translate(0, -50%);
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid var(--border-line);
-    border-left: 3px solid var(--accent-orange);
-    padding: 3px 8px;
-    border-radius: 2px;
+    pointer-events: none;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 8px;
+    font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.5px;
     color: var(--text-dark);
+    letter-spacing: 0.8px;
     white-space: nowrap;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    pointer-events: none;
-    transition: opacity 0.3s;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    transform: translate(12px, -50%);
+    background: rgba(255, 255, 255, 0.85);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border-left: 2px solid var(--accent-orange);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   }
-  .dom-label .sub {
-    font-size: 6.5px;
-    color: var(--text-muted);
-    font-weight: 500;
-    display: block;
-    margin-top: 1px;
-  }
-
-  /* Grid overlay */
-  .grid-bg-overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image: 
-      radial-gradient(circle at 50% 50%, rgba(0,0,0,0.015) 0%, transparent 70%),
-      linear-gradient(to right, rgba(0,0,0,0.02) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(0,0,0,0.02) 1px, transparent 1px);
-    background-size: 100% 100%, 40px 40px, 40px 40px;
-  }
+  .dom-label .sub { display: block; font-size: 7.5px; font-weight: 500; color: var(--text-muted); }
 `;
 document.head.appendChild(style);
 
 app.innerHTML = `
   <div id="canvas-container">
     <canvas id="gl"></canvas>
-    <div class="grid-bg-overlay"></div>
     <canvas id="labels-canvas"></canvas>
   </div>
 
   <div id="hud-layer">
     <!-- Top Bar -->
-    <div class="top-bar">
-      <div class="brand-group interactive">
+    <div class="top-bar interactive">
+      <div class="brand-group">
         <div class="logo-box">
-          <svg viewBox="0 0 24 24"><path d="M12 2C8 2 6 5 6 7c0 1.5.8 2.8 2 3.8V14c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-3.2c1.2-1 2-2.3 2-3.8 0-2-2-5-6-5zm-3 15v4h2v-4H9zm4 0v4h2v-4h-2z"/></svg>
-          <span>HB-7</span>
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          HB-7
         </div>
         <div class="title-block">
           <div class="title-tag">ROBOTIC POLLINATOR · MICRO AIR VEHICLE</div>
@@ -219,20 +215,30 @@ app.innerHTML = `
         </div>
       </div>
 
-      <!-- Top Center Specs -->
-      <div class="top-center interactive">
+      <div class="top-center">
         <div class="spec-item">
-          <span class="spec-label">LIFT LOAD</span>
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <span class="spec-label">LIFT LOAD</span>
+            <span class="spec-label" style="color:var(--text-dark); font-weight:700;">66%</span>
+          </div>
           <div class="lift-load-bar" id="load-bar"></div>
+          <div style="display:flex; justify-content:space-between; font-size:6.5px; color:var(--text-muted); margin-top:1px;">
+            <span>IDLE</span>
+            <span>HOVER</span>
+            <span>MAX</span>
+          </div>
         </div>
+
         <div class="spec-item">
           <span class="spec-label">SIM ID</span>
           <span class="spec-val">HB7-0412</span>
         </div>
+
         <div class="spec-item">
           <span class="spec-label">RUNTIME</span>
           <span class="spec-val" id="val-runtime">00:00:21</span>
         </div>
+
         <div class="spec-item">
           <span class="spec-label">STATUS</span>
           <span class="status-badge" id="val-status">
@@ -240,21 +246,22 @@ app.innerHTML = `
             <span id="val-status-text">HOVER</span>
           </span>
         </div>
+
         <div class="spec-item">
           <span class="spec-label">OPERATOR</span>
-          <span class="spec-val">LAB 3 · R.K.</span>
+          <span class="spec-val">LAB 3 - R.K.</span>
         </div>
       </div>
     </div>
 
-    <!-- Operating Mode Floating Tag -->
-    <div class="flight-mode-anchor">
-      <div class="flight-mode-tag">FLIGHT MODE</div>
-      <div class="flight-mode-title" id="mode-title">HOVER</div>
-      <div class="flight-mode-sub" id="mode-desc">STATION KEEPING · 144 MM AGL</div>
+    <!-- Center Floating Flight Status Tag -->
+    <div class="flight-mode-tag">
+      <span class="flight-mode-sub">FLIGHT MODE</span>
+      <span class="flight-mode-big" id="mode-title">HOVER</span>
+      <span class="flight-mode-spec" id="mode-desc">STATION KEEPING · 144 MM AGL</span>
     </div>
 
-    <!-- Panels Wrapper -->
+    <!-- Left & Right Telemetry Panels -->
     <div class="panels-wrapper">
       <!-- Left Column -->
       <div class="panel-col-left">
@@ -266,18 +273,21 @@ app.innerHTML = `
           </div>
           <div class="metric-row">
             <div>
-              <span class="metric-big" id="val-freq">7.5</span><span class="metric-unit">HZ</span>
-              <div style="font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono'; text-transform:uppercase;">STROKE FREQUENCY</div>
+              <span class="metric-big" id="val-freq">7.5</span>
+              <span class="metric-unit">HZ</span>
+              <div style="font-size:7.5px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">STROKE FREQUENCY</div>
             </div>
             <div style="text-align:right;">
-              <span class="metric-big">±32°</span>
-              <div style="font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono'; text-transform:uppercase;">AMPLITUDE</div>
+              <span class="metric-sub" id="val-amp">±32°</span>
+              <div style="font-size:7.5px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">AMPLITUDE</div>
             </div>
           </div>
-          <canvas class="wave-canvas" id="wing-canvas" width="200" height="42"></canvas>
+          <canvas class="wave-canvas" id="wing-canvas" width="190" height="42"></canvas>
           <div class="wave-meta">
-            <span>PLAYBACK <b style="color:var(--text-dark);">1.0×</b></span>
+            <span>-1.2 S</span>
+            <span>PLAYBACK 1.0x</span>
             <span>SHUTTER 1/60</span>
+            <span>NOW</span>
           </div>
         </div>
 
@@ -289,10 +299,11 @@ app.innerHTML = `
           </div>
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
-              <span class="metric-big">80</span><span class="metric-unit">%</span>
-              <div style="font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono';">BATTERY</div>
+              <span class="metric-big">80</span>
+              <span class="metric-unit">%</span>
+              <div style="font-size:7.5px; color:var(--text-muted); text-transform:uppercase; font-family:'JetBrains Mono';">BATTERY</div>
             </div>
-            <div class="battery-bars" style="width: 100px;">
+            <div class="battery-bars" style="width:110px;">
               <div class="battery-seg fill-red"></div>
               <div class="battery-seg fill-red"></div>
               <div class="battery-seg fill-green"></div>
@@ -327,9 +338,10 @@ app.innerHTML = `
             <span class="card-title">LEG SERVOS</span>
             <span class="card-idx">03</span>
           </div>
-          <div style="display:flex; justify-content:space-between; font-size:7.5px; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:6px;">
-            <span>LOAD PER LEG · KNEE TORQUE</span>
-            <span class="subsys-tag green" id="leg-tag">ACTIVE</span>
+          <div style="display:flex; justify-content:space-between; font-size:7.5px; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:6px; text-transform:uppercase;">
+            <span>LOAD PER LEG</span>
+            <span>KNEE TORQUE</span>
+            <span style="color:var(--accent-green); font-weight:700;">PASSIVE</span>
           </div>
           <div id="arm-rows"></div>
         </div>
@@ -337,39 +349,27 @@ app.innerHTML = `
 
       <!-- Right Column -->
       <div class="panel-col-right">
-        <!-- 04 FLIGHT / ATTITUDE -->
+        <!-- 04 FLIGHT -->
         <div class="tech-card">
           <div class="card-header">
             <span class="card-title">FLIGHT</span>
             <span class="card-idx">04</span>
           </div>
-          <div class="gimbal-box">
-            <div class="gimbal-circle">
-              <div class="gimbal-horizon" id="gimbal-line"></div>
+          <div class="horizon-wrapper">
+            <div class="horizon-circle">
+              <div class="horizon-sky"></div>
+              <div class="horizon-line" id="horizon-line"></div>
             </div>
-            <div class="gimbal-sub">
-              <div class="gimbal-row">
-                <span class="gimbal-lbl">ALT AGL</span>
-                <span class="gimbal-val" id="val-alt">144.0 MM</span>
-              </div>
-              <div class="gimbal-row">
-                <span class="gimbal-lbl">V/S</span>
-                <span class="gimbal-val">+0.6 MM/S</span>
-              </div>
-              <div class="gimbal-row">
-                <span class="gimbal-lbl">PITCH</span>
-                <span class="gimbal-val" id="val-pitch">+0.03°</span>
-              </div>
-              <div class="gimbal-row">
-                <span class="gimbal-lbl">ROLL</span>
-                <span class="gimbal-val" id="val-roll">-0.57°</span>
-              </div>
+            <div class="horizon-stats">
+              <div class="h-stat"><span class="h-lbl">ALT AGL</span><span class="h-num" id="val-alt">144.0 MM</span></div>
+              <div class="h-stat"><span class="h-lbl">V/S</span><span class="h-num">+0.6 MM/S</span></div>
+              <div class="h-stat"><span class="h-lbl">PITCH</span><span class="h-num">+0.03°</span></div>
+              <div class="h-stat"><span class="h-lbl">ROLL</span><span class="h-num">-0.57°</span></div>
             </div>
           </div>
-          <div style="display:flex; justify-content:space-between; font-size:8px; font-family:'JetBrains Mono'; color:var(--text-muted); border-top:1px solid var(--border-line); padding-top:4px;">
-            <span>HOLD</span>
-            <span>POSITION</span>
-            <span>AIRSPEED <b style="color:var(--text-dark);">0.00 M/S</b></span>
+          <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:6px; border-top:1px solid var(--border-line); font-family:'JetBrains Mono'; font-size:8px; color:var(--text-muted); text-transform:uppercase;">
+            <span>HOLD <strong>POSITION</strong></span>
+            <span>AIRSPEED <strong>0.00 M/S</strong></span>
           </div>
         </div>
 
@@ -383,7 +383,7 @@ app.innerHTML = `
             <button class="pill-btn active" data-assembly="hero">HERO</button>
             <button class="pill-btn" data-assembly="optics">OPTICS</button>
             <button class="pill-btn" data-assembly="wing">WING</button>
-            <button class="pill-btn" data-assembly="leg-l2">LEG L2</button>
+            <button class="pill-btn" data-assembly="leg">LEG L2</button>
             <button class="pill-btn" data-assembly="thorax">THORAX</button>
             <button class="pill-btn" data-assembly="abdomen">ABDOMEN</button>
           </div>
@@ -395,7 +395,7 @@ app.innerHTML = `
             <span class="card-title">DISPLAY</span>
             <span class="card-idx">06</span>
           </div>
-          <div class="btn-grid-3">
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px;">
             <button class="pill-btn active" id="btn-labels">LABELS</button>
             <button class="pill-btn" id="btn-exploded">EXPLODED</button>
             <button class="pill-btn active" id="btn-motion">MOTION BLUR</button>
@@ -483,7 +483,7 @@ app.innerHTML = `
   </div>
 `;
 
-// Populate load bar (66% = 13 filled)
+// Populate load bar
 const loadBar = document.getElementById('load-bar');
 for (let i = 0; i < 20; i++) {
   const seg = document.createElement('div');
@@ -517,7 +517,7 @@ legData.forEach(item => {
 });
 
 // =========================================================================
-// THREE.JS 3D SCENE SETUP
+// THREE.JS 3D SCENE SETUP & STUDIO LIGHTING
 // =========================================================================
 
 const canvas = document.getElementById('gl');
@@ -527,8 +527,8 @@ const labelsCtx = labelsCanvas.getContext('2d');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf6f4f0);
 
-const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(3.2, 1.6, 3.6);
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(3.4, 1.8, 3.8);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -550,46 +550,54 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// =========================================================================
-// LIGHTING & SHADOW GROUND
-// =========================================================================
-
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.25);
 scene.add(ambientLight);
 
-const mainKeyLight = new THREE.DirectionalLight(0xffffff, 2.2);
-mainKeyLight.position.set(4, 7, 5);
+const mainKeyLight = new THREE.DirectionalLight(0xfffbf5, 2.4);
+mainKeyLight.position.set(5, 8, 5);
 mainKeyLight.castShadow = true;
 mainKeyLight.shadow.mapSize.width = 2048;
 mainKeyLight.shadow.mapSize.height = 2048;
+mainKeyLight.shadow.camera.near = 0.5;
+mainKeyLight.shadow.camera.far = 25;
+mainKeyLight.shadow.camera.left = -4;
+mainKeyLight.shadow.camera.right = 4;
+mainKeyLight.shadow.camera.top = 4;
+mainKeyLight.shadow.camera.bottom = -4;
 mainKeyLight.shadow.bias = -0.0001;
 scene.add(mainKeyLight);
 
-const fillLight = new THREE.DirectionalLight(0xffeedd, 0.7);
-fillLight.position.set(-5, 2, -3);
+const fillLight = new THREE.DirectionalLight(0xedf4ff, 0.8);
+fillLight.position.set(-6, 3, -4);
 scene.add(fillLight);
 
-// Floor
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.ShadowMaterial({ opacity: 0.14 }));
+const rimLight = new THREE.DirectionalLight(0xffecd2, 1.1);
+rimLight.position.set(2, -4, -5);
+scene.add(rimLight);
+
+// Studio Floor Shadow Receiver
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(32, 32), new THREE.ShadowMaterial({ opacity: 0.16 }));
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -1.0;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// Ground Grid
-const gridHelper = new THREE.GridHelper(12, 24, 0xd0ccc3, 0xe5e1d7);
+// Precision Grid Helper
+const gridHelper = new THREE.GridHelper(12, 24, 0xd8d4cc, 0xe9e5dc);
 gridHelper.position.y = -0.99;
 scene.add(gridHelper);
 
-// Teardown Orbit Calibration Circles in 3D Space (matching Image 2)
+// 3D Teardown Orbit Calibration Circles (Image 2)
 const orbitRingsGroup = new THREE.Group();
+orbitRingsGroup.visible = false;
 scene.add(orbitRingsGroup);
-const orbitRadii = [1.2, 1.8, 2.4];
-orbitRadii.forEach(r => {
+
+[1.1, 1.7, 2.3].forEach(r => {
   const circleGeo = new THREE.BufferGeometry();
   const pts = [];
-  for (let a = 0; a <= 64; a++) {
-    const ang = (a / 64) * Math.PI * 2;
+  for (let a = 0; a <= 72; a++) {
+    const ang = (a / 72) * Math.PI * 2;
     pts.push(new THREE.Vector3(Math.cos(ang) * r, 0, Math.sin(ang) * r));
   }
   circleGeo.setFromPoints(pts);
@@ -600,49 +608,63 @@ orbitRadii.forEach(r => {
 });
 
 // =========================================================================
-// MATERIALS
+// PREMIUM STUDIO MATERIALS
 // =========================================================================
 
-const whiteMat = new THREE.MeshStandardMaterial({
+const whiteShellMat = new THREE.MeshStandardMaterial({
   color: 0xfaf8f5,
-  metalness: 0.1,
-  roughness: 0.24
+  metalness: 0.08,
+  roughness: 0.22
 });
 
 const orangeMat = new THREE.MeshStandardMaterial({
   color: 0xff4800,
-  metalness: 0.4,
-  roughness: 0.28
+  metalness: 0.42,
+  roughness: 0.26
 });
 
 const darkMechMat = new THREE.MeshStandardMaterial({
-  color: 0x18181a,
-  metalness: 0.85,
+  color: 0x18181b,
+  metalness: 0.88,
   roughness: 0.35
 });
 
+const chromeMat = new THREE.MeshStandardMaterial({
+  color: 0xe6e4e0,
+  metalness: 0.95,
+  roughness: 0.12
+});
+
+const copperMat = new THREE.MeshStandardMaterial({
+  color: 0xc86a36,
+  metalness: 0.82,
+  roughness: 0.3
+});
+
 const lensMat = new THREE.MeshPhysicalMaterial({
-  color: 0x050b14,
-  metalness: 0.9,
-  roughness: 0.05,
-  transmission: 0.5,
-  reflectivity: 0.95
+  color: 0x050b16,
+  metalness: 0.92,
+  roughness: 0.04,
+  transmission: 0.65,
+  reflectivity: 0.95,
+  clearcoat: 1.0
 });
 
 const wingMat = new THREE.MeshPhysicalMaterial({
   color: 0xffffff,
-  transmission: 0.88,
-  opacity: 0.85,
+  transmission: 0.9,
+  opacity: 0.86,
   transparent: true,
-  roughness: 0.15,
+  roughness: 0.12,
   thickness: 0.04,
+  clearcoat: 1.0,
   side: THREE.DoubleSide
 });
 
 const motionBlurMat = new THREE.MeshBasicMaterial({
   color: 0xffffff,
   transparent: true,
-  opacity: 0.18,
+  opacity: 0.22,
   side: THREE.DoubleSide
 });
 
@@ -672,39 +694,108 @@ beeRoot.add(legsGroup);
 beeRoot.add(hardwareGroup);
 
 // --- 1. HEAD & OPTIC ASSEMBLY ---
-headGroup.position.set(0, 0.15, 0.65);
+headGroup.position.set(0, 0.18, 0.68);
 
-// White Dome Shell
-const headShell = new THREE.Mesh(new THREE.SphereGeometry(0.38, 32, 24), whiteMat);
-headShell.scale.set(1.0, 0.95, 1.15);
-headShell.castShadow = true;
-headGroup.add(headShell);
+// Faceted Robotic Head Shell
+const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.38, 36, 28), whiteShellMat);
+headMesh.scale.set(0.96, 0.92, 1.15);
+headMesh.castShadow = true;
+headMesh.receiveShadow = true;
+headGroup.add(headMesh);
 
-// Large Camera Eye with Orange Bezel
-const eyeBezel = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.035, 16, 32), orangeMat);
-eyeBezel.position.set(0, 0.02, 0.4);
-headGroup.add(eyeBezel);
+// Center visor seam plate
+const headSeam = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.012, 8, 32), darkMechMat);
+headSeam.rotation.y = Math.PI / 2;
+headGroup.add(headSeam);
 
-const eyeLens = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.06, 24), lensMat);
-eyeLens.rotation.x = Math.PI / 2;
-eyeLens.position.set(0, 0.02, 0.41);
-headGroup.add(eyeLens);
+// Primary Optic Camera Snout (Protruding front snout matching Image 1)
+const snoutGroup = new THREE.Group();
+snoutGroup.position.set(0, 0.02, 0.38);
+headGroup.add(snoutGroup);
 
-const irDot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 12), orangeMat);
-irDot.position.set(0, 0.02, 0.43);
-headGroup.add(irDot);
+const snoutBase = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.08, 32), darkMechMat);
+snoutBase.rotation.x = Math.PI / 2;
+snoutGroup.add(snoutBase);
 
-// Dual Articulated Antennae
+const snoutOrangeRim = new THREE.Mesh(new THREE.TorusGeometry(0.23, 0.032, 16, 36), orangeMat);
+snoutOrangeRim.position.z = 0.05;
+snoutGroup.add(snoutOrangeRim);
+
+const snoutLensBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.06, 32), chromeMat);
+snoutLensBarrel.rotation.x = Math.PI / 2;
+snoutLensBarrel.position.z = 0.07;
+snoutGroup.add(snoutLensBarrel);
+
+const eyeLens = new THREE.Mesh(new THREE.SphereGeometry(0.165, 24, 20, 0, Math.PI * 2, 0, Math.PI * 0.5), lensMat);
+eyeLens.rotation.x = -Math.PI / 2;
+eyeLens.position.z = 0.09;
+snoutGroup.add(eyeLens);
+
+const irDot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 16, 16), orangeMat);
+irDot.position.z = 0.11;
+snoutGroup.add(irDot);
+
+// Lateral Optic Pods (Left & Right)
+function createSideOptic(side) {
+  const sideOptic = new THREE.Group();
+  sideOptic.position.set(side * 0.32, 0.04, 0.15);
+  sideOptic.rotation.set(0, side * 0.7, 0);
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.05, 20), darkMechMat);
+  base.rotation.x = Math.PI / 2;
+  sideOptic.add(base);
+
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.016, 12, 24), orangeMat);
+  ring.position.z = 0.03;
+  sideOptic.add(ring);
+
+  const lens = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 14, 0, Math.PI * 2, 0, Math.PI * 0.5), lensMat);
+  lens.rotation.x = -Math.PI / 2;
+  lens.position.z = 0.035;
+  sideOptic.add(lens);
+
+  return sideOptic;
+}
+headGroup.add(createSideOptic(-1));
+headGroup.add(createSideOptic(1));
+
+// Robotic Mouthparts / Mandibles
+const mandibleL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.08), darkMechMat);
+mandibleL.position.set(-0.1, -0.26, 0.32);
+mandibleL.rotation.set(0.4, 0, -0.2);
+headGroup.add(mandibleL);
+
+const mandibleR = mandibleL.clone();
+mandibleR.position.x = 0.1;
+mandibleR.rotation.z = 0.2;
+headGroup.add(mandibleR);
+
+// Articulated Twin Antennae
 function createAntenna(side) {
   const ant = new THREE.Group();
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.55, 8), darkMechMat);
-  stem.position.y = 0.28;
+  ant.position.set(side * 0.14, 0.32, 0.18);
+  ant.rotation.set(-0.25, side * 0.12, side * 0.28);
+
+  const baseBall = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 12), orangeMat);
+  ant.add(baseBall);
+
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.62, 12), darkMechMat);
+  stem.position.y = 0.31;
+  stem.castShadow = true;
   ant.add(stem);
-  const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.025, 0.15, 12), orangeMat);
-  tip.position.y = 0.56;
+
+  const midJoint = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.05, 12), chromeMat);
+  midJoint.position.y = 0.35;
+  ant.add(midJoint);
+
+  const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.026, 0.16, 16), orangeMat);
+  tip.position.y = 0.65;
   ant.add(tip);
-  ant.position.set(side * 0.16, 0.32, 0.2);
-  ant.rotation.set(-0.25, side * 0.15, side * 0.35);
+
+  const tipLens = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 12), darkMechMat);
+  tipLens.position.y = 0.74;
+  ant.add(tipLens);
+
   return ant;
 }
 const antL = createAntenna(-1);
@@ -712,138 +803,233 @@ const antR = createAntenna(1);
 headGroup.add(antL, antR);
 
 // --- 2. 10-SEGMENT NECK COLLAR BEARING ---
-neckGroup.position.set(0, 0.12, 0.38);
-const neckCollar = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.035, 16, 32), orangeMat);
-neckGroup.add(neckCollar);
+neckGroup.position.set(0, 0.15, 0.4);
 
+const collarOuter = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.032, 16, 36), orangeMat);
+neckGroup.add(collarOuter);
+
+const collarInner = new THREE.Mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.08, 32, 1, true), darkMechMat);
+collarInner.rotation.x = Math.PI / 2;
+neckGroup.add(collarInner);
+
+const neckBeads = [];
 for (let b = 0; b < 10; b++) {
   const ang = (b / 10) * Math.PI * 2;
-  const bead = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 10), darkMechMat);
-  bead.position.set(Math.cos(ang) * 0.32, Math.sin(ang) * 0.32, 0);
+  const bead = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 12), chromeMat);
+  bead.position.set(Math.cos(ang) * 0.34, Math.sin(ang) * 0.34, 0);
   neckGroup.add(bead);
+  neckBeads.push(bead);
 }
 
-// --- 3. THORAX & INNER DRIVE GEAR CORE ---
-thoraxGroup.position.set(0, 0.1, 0);
+// --- 3. THORAX & EXPOSED DENSE MECHANICAL DRIVE TRAIN ---
+thoraxGroup.position.set(0, 0.12, 0);
 
-// White segmented shell pods
-const thoraxShell = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 0.65, 32), whiteMat);
-thoraxShell.rotation.x = Math.PI / 2;
-thoraxShell.castShadow = true;
-thoraxGroup.add(thoraxShell);
+// Top & Bottom Ceramic Carapace Halves
+const thoraxTop = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 0.72, 32, 1, false, 0, Math.PI), whiteShellMat);
+thoraxTop.rotation.set(0, 0, Math.PI / 2);
+thoraxTop.rotation.y = Math.PI / 2;
+thoraxTop.castShadow = true;
+thoraxGroup.add(thoraxTop);
 
-const tRing1 = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.02, 12, 32), orangeMat);
-tRing1.position.z = -0.18;
-thoraxGroup.add(tRing1);
+const tRibbon1 = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.018, 12, 36), orangeMat);
+tRibbon1.position.z = -0.22;
+thoraxGroup.add(tRibbon1);
 
-const tRing2 = tRing1.clone();
-tRing2.position.z = 0.18;
-thoraxGroup.add(tRing2);
+const tRibbon2 = tRibbon1.clone();
+tRibbon2.position.z = 0.22;
+thoraxGroup.add(tRibbon2);
 
-// Dense inner drive gears (spinning free)
-gearCoreGroup.position.set(0, 0.1, 0);
-for (let g = 0; g < 4; g++) {
-  const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.26 - g * 0.04, 0.26 - g * 0.04, 0.06, 24), darkMechMat);
-  gear.rotation.x = Math.PI / 2;
-  gear.position.z = (g - 1.5) * 0.1;
-  gearCoreGroup.add(gear);
+// Dense Inner Drive Machinery (3 gears + 11 actuators + copper coils)
+gearCoreGroup.position.set(0, 0.12, 0);
 
-  const gTeeth = new THREE.Mesh(new THREE.TorusGeometry(0.26 - g * 0.04, 0.015, 8, 24), orangeMat);
-  gTeeth.position.z = gear.position.z;
-  gearCoreGroup.add(gTeeth);
+const mainShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.8, 16), chromeMat);
+mainShaft.rotation.x = Math.PI / 2;
+gearCoreGroup.add(mainShaft);
+
+// 3 Functional Drive Gears with Tooth Profiles
+const gears = [];
+[
+  { z: -0.16, r: 0.28, teeth: 24, mat: darkMechMat },
+  { z: 0.0, r: 0.34, teeth: 32, mat: orangeMat },
+  { z: 0.16, r: 0.26, teeth: 20, mat: darkMechMat }
+].forEach((g, idx) => {
+  const gearPivot = new THREE.Group();
+  gearPivot.position.z = g.z;
+  
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(g.r, g.r, 0.05, g.teeth), g.mat);
+  rim.rotation.x = Math.PI / 2;
+  rim.castShadow = true;
+  gearPivot.add(rim);
+
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.07, 16), chromeMat);
+  hub.rotation.x = Math.PI / 2;
+  gearPivot.add(hub);
+
+  gearCoreGroup.add(gearPivot);
+  gears.push({ group: gearPivot, dir: idx % 2 === 0 ? 1 : -1, speed: 2.5 + idx * 0.8 });
+});
+
+// 11 Linear Actuator Cylinders & Hydraulic Rods
+for (let a = 0; a < 11; a++) {
+  const act = new THREE.Group();
+  const ang = (a / 11) * Math.PI * 2;
+  const rad = 0.26;
+  act.position.set(Math.cos(ang) * rad, Math.sin(ang) * rad, (Math.random() - 0.5) * 0.35);
+
+  const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.18, 10), darkMechMat);
+  sleeve.rotation.z = ang + Math.PI / 2;
+  act.add(sleeve);
+
+  const piston = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.12, 10), chromeMat);
+  piston.position.set(Math.cos(ang) * 0.06, Math.sin(ang) * 0.06, 0);
+  piston.rotation.z = sleeve.rotation.z;
+  act.add(piston);
+
+  gearCoreGroup.add(act);
 }
 
-// Inner high-density wires and pistons
-for (let w = 0; w < 12; w++) {
-  const wireCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, -0.2),
-    new THREE.Vector3((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.3, 0),
-    new THREE.Vector3((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, 0.2)
+// Tangled black & orange wiring conduits and copper motor coils
+for (let w = 0; w < 18; w++) {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.2, -0.25),
+    new THREE.Vector3((Math.random() - 0.5) * 0.45, (Math.random() - 0.5) * 0.35, 0),
+    new THREE.Vector3((Math.random() - 0.5) * 0.25, (Math.random() - 0.5) * 0.2, 0.25)
   ]);
-  const wire = new THREE.Mesh(new THREE.TubeGeometry(wireCurve, 12, 0.012, 6, false), Math.random() > 0.4 ? darkMechMat : orangeMat);
-  gearCoreGroup.add(wire);
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.01, 6, false), w % 3 === 0 ? orangeMat : (w % 3 === 1 ? darkMechMat : copperMat));
+  gearCoreGroup.add(tube);
 }
 
-// --- 4. ABDOMEN CAPSULE (GEAR TRAIN & RETURN SPRING) ---
-abdomenGroup.position.set(0, 0.06, -0.65);
+// --- 4. ABDOMEN CAPSULE (TELESCOPING SEGMENTS & RETURN SPRING) ---
+abdomenGroup.position.set(0, 0.08, -0.72);
 
-const abdShell = new THREE.Mesh(new THREE.SphereGeometry(0.44, 32, 24), whiteMat);
-abdShell.scale.set(0.9, 0.9, 1.7);
-abdShell.castShadow = true;
-abdomenGroup.add(abdShell);
+const abdSegments = [];
+const numAbdSegs = 4;
+for (let s = 0; s < numAbdSegs; s++) {
+  const segGroup = new THREE.Group();
+  segGroup.position.z = -s * 0.22;
+  
+  const rad = 0.42 * Math.pow(0.88, s);
+  const shell = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.88, rad, 0.24, 28), whiteShellMat);
+  shell.rotation.x = Math.PI / 2;
+  shell.castShadow = true;
+  segGroup.add(shell);
 
-const abdRing = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.025, 12, 32), orangeMat);
-abdRing.position.z = 0.18;
-abdomenGroup.add(abdRing);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(rad, 0.016, 10, 28), orangeMat);
+  ring.position.z = 0.11;
+  segGroup.add(ring);
 
-const stingerTip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.38, 16), darkMechMat);
+  abdomenGroup.add(segGroup);
+  abdSegments.push(segGroup);
+}
+
+// Internal Helical Return Spring in Abdomen Core
+const springPts = [];
+for (let t = 0; t <= 120; t++) {
+  const p = t / 120;
+  const ang = p * Math.PI * 14;
+  springPts.push(new THREE.Vector3(Math.cos(ang) * 0.12, Math.sin(ang) * 0.12, -p * 0.7));
+}
+const springGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(springPts), 90, 0.014, 6, false);
+const springMesh = new THREE.Mesh(springGeo, darkMechMat);
+abdomenGroup.add(springMesh);
+
+// Tapered Stinger Nozzle Tip
+const stingerTip = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.36, 20), darkMechMat);
 stingerTip.rotation.x = -Math.PI / 2;
-stingerTip.position.z = -0.82;
+stingerTip.position.z = -0.92;
 abdomenGroup.add(stingerTip);
 
-// --- 5. TRANSLUCENT FLAPPING WINGS & MOTION BLUR FAN ARCS ---
-wingsGroup.position.set(0, 0.36, 0.05);
+const stingerGlow = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 10), orangeMat);
+stingerGlow.position.z = -1.1;
+abdomenGroup.add(stingerGlow);
+
+// --- 5. 4 WINGS (2 FOREWINGS, 2 HINDWINGS) WITH BIONIC VEINS ---
+wingsGroup.position.set(0, 0.42, 0.05);
 
 const wingLRoot = new THREE.Group();
-wingLRoot.position.set(-0.35, 0, 0);
+wingLRoot.position.set(-0.36, 0, 0);
 wingsGroup.add(wingLRoot);
 
 const wingRRoot = new THREE.Group();
-wingRRoot.position.set(0.35, 0, 0);
+wingRRoot.position.set(0.36, 0, 0);
 wingsGroup.add(wingRRoot);
 
-function createVeinedWingMesh(isLeft) {
-  const g = new THREE.Group();
+function createVeinedWing(isLeft, isForewing) {
+  const wing = new THREE.Group();
   const dir = isLeft ? -1 : 1;
+  const scale = isForewing ? 1.0 : 0.72;
 
-  // Wing shape outline
+  // Wing Quick Release Hinge (Orange Block)
+  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.12, 16), orangeMat);
+  hinge.rotation.z = Math.PI / 2;
+  wing.add(hinge);
+
+  const hingePin = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 12), chromeMat);
+  hingePin.rotation.z = Math.PI / 2;
+  wing.add(hingePin);
+
+  // Carbon Leading Edge Spar
+  const sparGeo = new THREE.CylinderGeometry(0.018 * scale, 0.008 * scale, 2.1 * scale, 12);
+  const spar = new THREE.Mesh(sparGeo, darkMechMat);
+  spar.position.set(dir * 1.05 * scale, 0, 0.38 * scale);
+  spar.rotation.z = -dir * 0.42;
+  wing.add(spar);
+
+  // Orange spar tip
+  const sparTip = new THREE.Mesh(new THREE.ConeGeometry(0.02 * scale, 0.12 * scale, 12), orangeMat);
+  sparTip.position.set(dir * 2.05 * scale, 0, 0.76 * scale);
+  sparTip.rotation.z = -dir * 0.42;
+  wing.add(sparTip);
+
+  // Iridescent Membrane Shape
   const shape = new THREE.Shape();
   shape.moveTo(0, 0);
-  shape.bezierCurveTo(dir * 0.5, 0.2, dir * 1.2, 0.6, dir * 1.8, 0.85);
-  shape.bezierCurveTo(dir * 1.9, 0.7, dir * 1.5, 0.15, dir * 0.6, 0);
-  shape.bezierCurveTo(dir * 0.2, -0.1, 0, 0, 0, 0);
+  shape.bezierCurveTo(dir * 0.6 * scale, 0.2 * scale, dir * 1.4 * scale, 0.7 * scale, dir * 2.1 * scale, 0.82 * scale);
+  shape.bezierCurveTo(dir * 2.15 * scale, 0.65 * scale, dir * 1.6 * scale, 0.15 * scale, dir * 0.7 * scale, -0.05 * scale);
+  shape.bezierCurveTo(dir * 0.25 * scale, -0.08 * scale, 0, 0, 0, 0);
 
-  const geo = new THREE.ShapeGeometry(shape, 18);
-  const mesh = new THREE.Mesh(geo, wingMat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.castShadow = true;
-  g.add(mesh);
+  const membrane = new THREE.Mesh(new THREE.ShapeGeometry(shape, 24), wingMat);
+  membrane.rotation.x = -Math.PI / 2;
+  membrane.castShadow = true;
+  wing.add(membrane);
 
-  // Black leading edge spar
-  const spar = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.008, 1.8, 8), darkMechMat);
-  spar.position.set(dir * 0.9, 0, 0.42);
-  spar.rotation.z = -dir * 0.45;
-  g.add(spar);
-
-  // Orange quick release hinge
-  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.1, 12), orangeMat);
-  hinge.rotation.z = Math.PI / 2;
-  g.add(hinge);
-
-  // Delicate bionic vein lines
-  const pts = [
-    new THREE.Vector3(0, 0, 0), new THREE.Vector3(dir * 0.9, 0, 0.42),
-    new THREE.Vector3(dir * 1.8, 0, 0.85), new THREE.Vector3(dir * 0.6, 0, 0.2)
+  // 3D Hexagonal / Bionic Vein Network
+  const veinLines = [
+    [new THREE.Vector3(0, 0, 0), new THREE.Vector3(dir * 0.9 * scale, 0, 0.38 * scale), new THREE.Vector3(dir * 2.0 * scale, 0, 0.8 * scale)],
+    [new THREE.Vector3(dir * 0.5 * scale, 0, 0.2 * scale), new THREE.Vector3(dir * 0.7 * scale, 0, 0.05 * scale)],
+    [new THREE.Vector3(dir * 1.0 * scale, 0, 0.42 * scale), new THREE.Vector3(dir * 1.3 * scale, 0, 0.18 * scale), new THREE.Vector3(dir * 1.2 * scale, 0, 0.02 * scale)],
+    [new THREE.Vector3(dir * 1.5 * scale, 0, 0.62 * scale), new THREE.Vector3(dir * 1.7 * scale, 0, 0.35 * scale)]
   ];
-  const veinLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x333333, transparent: true, opacity: 0.5 }));
-  g.add(veinLine);
+  veinLines.forEach(pts => {
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x222226, transparent: true, opacity: 0.6 }));
+    wing.add(line);
+  });
 
-  return g;
+  return wing;
 }
 
-const forewingL = createVeinedWingMesh(true);
+const forewingL = createVeinedWing(true, true);
+const hindwingL = createVeinedWing(true, false);
+hindwingL.position.set(-0.06, -0.04, -0.16);
+hindwingL.rotation.y = -0.18;
 wingLRoot.add(forewingL);
+wingLRoot.add(hindwingL);
 
-const forewingR = createVeinedWingMesh(false);
+const forewingR = createVeinedWing(false, true);
+const hindwingR = createVeinedWing(false, false);
+hindwingR.position.set(0.06, -0.04, -0.16);
+hindwingR.rotation.y = 0.18;
 wingRRoot.add(forewingR);
+wingRRoot.add(hindwingR);
 
 // Motion Blur Fan Geometry (as seen in Image 1 Hover Mode!)
 function createMotionBlurFan(isLeft) {
   const dir = isLeft ? -1 : 1;
-  const fanGeo = new THREE.RingGeometry(0.2, 1.85, 24, 1, isLeft ? Math.PI * 0.8 : -Math.PI * 0.3, Math.PI * 0.5);
+  const fanGeo = new THREE.RingGeometry(0.25, 2.15, 32, 1, isLeft ? Math.PI * 0.78 : -Math.PI * 0.28, Math.PI * 0.5);
   const fan = new THREE.Mesh(fanGeo, motionBlurMat);
   fan.rotation.x = Math.PI / 2;
-  fan.position.set(dir * 0.2, 0, 0.2);
+  fan.position.set(dir * 0.22, 0, 0.2);
   return fan;
 }
 const blurFanL = createMotionBlurFan(true);
@@ -851,91 +1037,117 @@ const blurFanR = createMotionBlurFan(false);
 wingLRoot.add(blurFanL);
 wingRRoot.add(blurFanR);
 
-// --- 6. SIX ARTICULATED TRIPOD LANDING LEGS ---
-legsGroup.position.set(0, -0.15, 0);
-
+// --- 6. 6 ARTICULATED ROBOTIC LEGS (TRIPOD STANCE MATCHING IMAGE 1) ---
+// Each leg features coxa servo, white boxed femur, orange knee hub, tibia strut, ankle ball, and 3-claw foot pad
 const legs = [];
-for (let side = -1; side <= 1; side += 2) {
-  const isLeft = side < 0;
-  for (let idx = 0; idx < 3; idx++) {
-    const legRoot = new THREE.Group();
-    const legZ = 0.25 - idx * 0.25;
-    legRoot.position.set(side * 0.38, 0, legZ);
-    legsGroup.add(legRoot);
+const legSpecs = [
+  { id: 'L1', side: -1, z: 0.28, angY: 0.45, kneeLen: 0.58, tibLen: 0.72 },
+  { id: 'L2', side: -1, z: 0.0,  angY: 0.0,  kneeLen: 0.64, tibLen: 0.78 },
+  { id: 'L3', side: -1, z: -0.28, angY: -0.45, kneeLen: 0.68, tibLen: 0.82 },
+  { id: 'R1', side: 1,  z: 0.28, angY: -0.45, kneeLen: 0.58, tibLen: 0.72 },
+  { id: 'R2', side: 1,  z: 0.0,  angY: 0.0,  kneeLen: 0.64, tibLen: 0.78 },
+  { id: 'R3', side: 1,  z: -0.28, angY: 0.45, kneeLen: 0.68, tibLen: 0.82 }
+];
 
-    // Orange hip servo ball
-    const hip = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 10), orangeMat);
-    legRoot.add(hip);
+legSpecs.forEach(spec => {
+  const legRoot = new THREE.Group();
+  legRoot.position.set(spec.side * 0.36, -0.05, spec.z);
+  legRoot.rotation.y = spec.angY;
+  legsGroup.add(legRoot);
 
-    // White upper femur tube
-    const femurGroup = new THREE.Group();
-    legRoot.add(femurGroup);
+  // Hip Coxa Servo
+  const hipServo = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.09, 16), orangeMat);
+  hipServo.rotation.x = Math.PI / 2;
+  legRoot.add(hipServo);
 
-    const femur = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.028, 0.65, 12), whiteMat);
-    femur.position.set(side * 0.16, -0.3, 0);
-    femur.rotation.z = side * 0.55;
-    femur.castShadow = true;
-    femurGroup.add(femur);
+  const hipCap = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.1, 16), darkMechMat);
+  hipCap.rotation.x = Math.PI / 2;
+  legRoot.add(hipCap);
 
-    // Knee servo joint with orange ring
-    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), darkMechMat);
-    knee.position.set(side * 0.32, -0.58, 0);
-    femurGroup.add(knee);
+  // Femur Upper Arm (angles upward-outward)
+  const femurGroup = new THREE.Group();
+  femurGroup.rotation.z = -spec.side * 0.75;
+  legRoot.add(femurGroup);
 
-    const kneeRing = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.012, 8, 16), orangeMat);
-    kneeRing.position.copy(knee.position);
-    femurGroup.add(kneeRing);
+  const femurBox = new THREE.Mesh(new THREE.BoxGeometry(0.07, spec.kneeLen, 0.06), whiteShellMat);
+  femurBox.position.y = spec.kneeLen / 2;
+  femurBox.castShadow = true;
+  femurGroup.add(femurBox);
 
-    // Slender lower tibia rod
-    const tibiaGroup = new THREE.Group();
-    tibiaGroup.position.copy(knee.position);
-    femurGroup.add(tibiaGroup);
+  // Weight reduction oval cutout in femur
+  const cutout = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.08, 12), darkMechMat);
+  cutout.rotation.x = Math.PI / 2;
+  cutout.position.y = spec.kneeLen / 2;
+  femurGroup.add(cutout);
 
-    const tibia = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.015, 0.72, 10), whiteMat);
-    tibia.position.set(side * 0.15, -0.35, 0.08);
-    tibia.rotation.z = -side * 0.38;
-    tibia.castShadow = true;
-    tibiaGroup.add(tibia);
+  // Knee Rotary Hinge Hub
+  const kneeHub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 20), orangeMat);
+  kneeHub.position.y = spec.kneeLen;
+  kneeHub.rotation.x = Math.PI / 2;
+  femurGroup.add(kneeHub);
 
-    // Rubber contact foot tip
-    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), darkMechMat);
-    foot.position.set(side * 0.28, -0.68, 0.15);
-    tibiaGroup.add(foot);
+  const kneeAxle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.09, 12), darkMechMat);
+  kneeAxle.position.copy(kneeHub.position);
+  kneeAxle.rotation.copy(kneeHub.rotation);
+  femurGroup.add(kneeAxle);
 
-    legs.push({
-      id: `${isLeft ? 'L' : 'R'}${idx + 1}`,
-      root: legRoot,
-      femur: femurGroup,
-      tibia: tibiaGroup,
-      foot,
-      side,
-      idx
-    });
-  }
-}
+  // Tibia Lower Leg (angles down towards floor)
+  const tibiaGroup = new THREE.Group();
+  tibiaGroup.position.set(0, spec.kneeLen, 0);
+  tibiaGroup.rotation.z = spec.side * 1.55;
+  femurGroup.add(tibiaGroup);
 
-// Scattered Small Teardown Hardware (screws, pins, washers floating in Image 2)
+  const tibiaStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.024, spec.tibLen, 12), whiteShellMat);
+  tibiaStrut.position.y = spec.tibLen / 2;
+  tibiaStrut.castShadow = true;
+  tibiaGroup.add(tibiaStrut);
+
+  // Hydraulic Micro-damper rod
+  const damper = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, spec.tibLen * 0.7, 8), chromeMat);
+  damper.position.set(spec.side * 0.02, spec.tibLen / 2, 0);
+  tibiaGroup.add(damper);
+
+  // Ankle Joint & Foot Pad
+  const ankleBall = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 12), orangeMat);
+  ankleBall.position.y = spec.tibLen;
+  tibiaGroup.add(ankleBall);
+
+  const footPad = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.03, 12), darkMechMat);
+  footPad.position.y = spec.tibLen + 0.02;
+  tibiaGroup.add(footPad);
+
+  legs.push({
+    id: spec.id,
+    root: legRoot,
+    femur: femurGroup,
+    tibia: tibiaGroup,
+    side: spec.side,
+    ankleBall
+  });
+});
+
+// Floating fasteners, nuts, and washers for exploded view (Image 2)
 for (let h = 0; h < 24; h++) {
-  const hMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.02, 0.02, 0.06, 8),
-    Math.random() > 0.5 ? orangeMat : darkMechMat
-  );
-  hMesh.position.set((Math.random() - 0.5) * 2.5, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 2.5);
-  hMesh.rotation.set(Math.random() * 3, Math.random() * 3, 0);
-  hardwareGroup.add(hMesh);
+  const fastener = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.04, 8), chromeMat);
+  const ang = (h / 24) * Math.PI * 2;
+  const dist = 1.1 + Math.random() * 0.8;
+  fastener.position.set(Math.cos(ang) * dist, (Math.random() - 0.5) * 0.8 + 0.3, Math.sin(ang) * dist);
+  fastener.rotation.set(Math.random() * 3, Math.random() * 3, 0);
+  hardwareGroup.add(fastener);
 }
+hardwareGroup.visible = false;
 
 // =========================================================================
-// CALLOUT LABELS & LEADER LINES
+// CALLOUT LABELS & LEADER LINES (Exact Match to Image 2)
 // =========================================================================
 
 const calloutDefs = [
-  { id: 'optics', text: 'OPTIC HEAD', sub: '2 - LENS · AMBER IR', getPos: () => headGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.2, 0.3)) },
-  { id: 'neck', text: 'NECK BEARING', sub: '10 SEGMENTS COLLAR', getPos: () => neckGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.2, 0.1, 0.1)) },
-  { id: 'wing_l', text: 'WING HINGE', sub: 'QUICK RELEASE · 7.5 HZ', getPos: () => wingLRoot.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(-0.4, 0.3, 0.2)) },
-  { id: 'gears', text: 'DRIVE GEARS', sub: 'SPINNING FREE', getPos: () => gearCoreGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.25, 0.1, -0.1)) },
-  { id: 'abdomen', text: 'ABDOMEN CAPSULE', sub: 'GEAR TRAIN · RETURN SPRING', getPos: () => abdomenGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, -0.2, -0.4)) },
-  { id: 'leg_l2', text: 'LEG SERVOS', sub: '6 LEGS · 3 JOINTS', getPos: () => legs[1].root.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(-0.3, -0.4, 0)) }
+  { id: 'wing_hinge', text: 'WING HINGE', sub: 'QUICK RELEASE', getPos: () => forewingR.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.15, 0.1, 0)) },
+  { id: 'optic_head', text: 'OPTIC HEAD', sub: '2 x 18 MM LENS · AMBER IR', getPos: () => snoutGroup.getWorldPosition(new THREE.Vector3()) },
+  { id: 'neck_bearing', text: 'NECK BEARING', sub: '10-SEGMENT COLLAR', getPos: () => neckGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.28, 0)) },
+  { id: 'drive_gears', text: 'DRIVE GEARS', sub: 'SPINNING FREE · 3 GEARS', getPos: () => gearCoreGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.15, 0)) },
+  { id: 'abdomen', text: 'ABDOMEN CAPSULE', sub: 'GEAR TRAIN · RETURN SPRING', getPos: () => abdomenGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.2, -0.3)) },
+  { id: 'leg_servos', text: 'LEG SERVOS', sub: '6 LEGS · 3 JOINTS', getPos: () => legs[1].root.getWorldPosition(new THREE.Vector3()) }
 ];
 
 const domLabels = [];
@@ -948,7 +1160,7 @@ calloutDefs.forEach(def => {
 });
 
 // =========================================================================
-// INTERACTIVE CONTROLS
+// INTERACTIVE CONTROLS & CAMERA SYSTEM
 // =========================================================================
 
 let currentAssembly = 'hero';
@@ -957,12 +1169,11 @@ let isExploded = false;
 let isTurntable = false;
 let isPlaying = true;
 let showMotionBlur = true;
-
 let explodedFactor = 0;
 
 let camLookAt = new THREE.Vector3(0, 0, 0);
 let currentLookAt = new THREE.Vector3(0, 0, 0);
-let spherical = new THREE.Spherical(4.6, Math.PI / 2.7, 0.75);
+let spherical = new THREE.Spherical(4.8, Math.PI / 2.6, 0.82);
 
 let isPointerDown = false;
 let prevPointerX = 0;
@@ -975,11 +1186,6 @@ canvas.addEventListener('pointerdown', (e) => {
   canvas.classList.add('grabbing');
 });
 
-window.addEventListener('pointerup', () => {
-  isPointerDown = false;
-  canvas.classList.remove('grabbing');
-});
-
 window.addEventListener('pointermove', (e) => {
   if (!isPointerDown) return;
   const dx = e.clientX - prevPointerX;
@@ -987,27 +1193,25 @@ window.addEventListener('pointermove', (e) => {
   prevPointerX = e.clientX;
   prevPointerY = e.clientY;
 
-  spherical.theta -= dx * 0.007;
-  spherical.phi -= dy * 0.007;
-  spherical.phi = Math.max(0.1, Math.min(Math.PI / 2 - 0.05, spherical.phi));
-  
-  if (isTurntable) {
-    isTurntable = false;
-    document.getElementById('btn-turntable').classList.remove('active');
-  }
+  spherical.theta -= dx * 0.006;
+  spherical.phi = Math.max(0.1, Math.min(Math.PI / 2 - 0.02, spherical.phi - dy * 0.006));
+});
+
+window.addEventListener('pointerup', () => {
+  isPointerDown = false;
+  canvas.classList.remove('grabbing');
 });
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  spherical.radius += e.deltaY * 0.004;
-  spherical.radius = Math.max(1.8, Math.min(8.5, spherical.radius));
+  spherical.radius = Math.max(1.8, Math.min(8.5, spherical.radius + e.deltaY * 0.004));
 }, { passive: false });
 
-// Assembly switcher
-const assemblyButtons = document.querySelectorAll('[data-assembly]');
-assemblyButtons.forEach(btn => {
+// Assembly Selector Buttons
+const assemblyBtns = document.querySelectorAll('[data-assembly]');
+assemblyBtns.forEach(btn => {
   btn.addEventListener('click', () => {
-    assemblyButtons.forEach(b => b.classList.remove('active'));
+    assemblyBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     setAssemblyMode(btn.dataset.assembly);
   });
@@ -1025,35 +1229,33 @@ function setAssemblyMode(mode) {
     descEl.textContent = 'STATION KEEPING · 144 MM AGL';
     statusText.textContent = 'HOVER';
     statusBadge.className = 'status-badge';
-    spherical.radius = 4.6;
-    spherical.phi = Math.PI / 2.7;
+    spherical.radius = 4.8;
+    spherical.phi = Math.PI / 2.6;
     camLookAt.set(0, 0, 0);
   } else if (mode === 'optics') {
     titleEl.textContent = 'OPTIC HEAD';
-    descEl.textContent = '2 - LENS · AMBER IR SENSOR';
+    descEl.textContent = '2 x 18 MM LENS · AMBER IR';
     statusText.textContent = 'OPTICS';
     statusBadge.className = 'status-badge';
     spherical.radius = 2.4;
-    spherical.phi = Math.PI / 2.4;
-    spherical.theta = 0.4;
-    camLookAt.set(0, 0.15, 0.65);
+    spherical.phi = Math.PI / 2.5;
+    camLookAt.set(0, 0.18, 0.68);
   } else if (mode === 'wing') {
     titleEl.textContent = 'WING ROOTS';
     descEl.textContent = '4 HINGES · 7.5 HZ CRANK';
-    statusText.textContent = 'WING ROOTS';
+    statusText.textContent = 'WING';
     statusBadge.className = 'status-badge';
     spherical.radius = 2.8;
     spherical.phi = Math.PI / 3.0;
-    spherical.theta = 1.0;
-    camLookAt.set(-0.35, 0.36, 0.1);
-  } else if (mode === 'leg-l2') {
+    camLookAt.set(0.35, 0.42, 0.1);
+  } else if (mode === 'leg') {
     titleEl.textContent = 'LEG SERVOS';
     descEl.textContent = 'LOAD PER LEG · KNEE TORQUE';
     statusText.textContent = 'LEG L2';
     statusBadge.className = 'status-badge';
     spherical.radius = 2.6;
     spherical.phi = Math.PI / 2.1;
-    camLookAt.set(-0.38, -0.3, 0);
+    camLookAt.set(-0.38, -0.2, 0);
   } else if (mode === 'thorax') {
     titleEl.textContent = 'THORAX DRIVE';
     descEl.textContent = '3 GEARS · 11 ACTUATORS';
@@ -1061,16 +1263,16 @@ function setAssemblyMode(mode) {
     statusBadge.className = 'status-badge';
     spherical.radius = 2.8;
     spherical.phi = Math.PI / 2.5;
-    camLookAt.set(0, 0.1, 0);
+    camLookAt.set(0, 0.12, 0);
   } else if (mode === 'abdomen') {
     titleEl.textContent = 'ABDOMEN CAPSULE';
     descEl.textContent = 'GEAR TRAIN · RETURN SPRING';
     statusText.textContent = 'ABDOMEN';
     statusBadge.className = 'status-badge';
-    spherical.radius = 3.2;
-    spherical.phi = Math.PI / 2.5;
-    spherical.theta = Math.PI * 0.8;
-    camLookAt.set(0, 0.06, -0.65);
+    spherical.radius = 3.0;
+    spherical.phi = Math.PI / 2.4;
+    spherical.theta = Math.PI * 0.85;
+    camLookAt.set(0, 0.08, -0.72);
   }
 }
 
@@ -1154,7 +1356,7 @@ function drawWingWave(time) {
 }
 
 // =========================================================================
-// ANIMATION LOOP
+// MAIN ANIMATION LOOP & KINEMATICS
 // =========================================================================
 
 let clock = new THREE.Clock();
@@ -1167,52 +1369,74 @@ function animate() {
   const time = clock.getElapsedTime();
 
   if (isPlaying) {
-    waveOffset += delta * 7.5 * Math.PI * 2; // 7.5 Hz stroke
+    waveOffset += delta * 7.5 * Math.PI * 2; // 7.5 Hz stroke frequency
     elapsedSimTime += delta;
     if (isTurntable) {
       spherical.theta += delta * 0.35;
     }
   }
 
-  // Camera lerp
+  // Camera lerping
   const targetCamPos = new THREE.Vector3().setFromSpherical(spherical).add(camLookAt);
   camera.position.lerp(targetCamPos, 0.08);
   currentLookAt.lerp(camLookAt, 0.08);
   camera.lookAt(currentLookAt);
 
+  // Exploded teardown interpolation
   const targetExploded = isExploded ? 1.0 : 0.0;
   explodedFactor += (targetExploded - explodedFactor) * 0.08;
 
-  // --- 1. EXPLODED TEARDOWN COMPONENT DISPLACEMENTS ---
-  headGroup.position.set(0, 0.15 + explodedFactor * 0.35, 0.65 + explodedFactor * 0.65);
-  neckGroup.position.set(0, 0.12 + explodedFactor * 0.2, 0.38 + explodedFactor * 0.35);
-  thoraxGroup.position.set(0, 0.1, -explodedFactor * 0.1);
-  gearCoreGroup.position.set(0, 0.1 + explodedFactor * 0.25, 0);
-  gearCoreGroup.rotation.y += isPlaying ? delta * 2.5 : 0;
-  abdomenGroup.position.set(0, 0.06 - explodedFactor * 0.25, -0.65 - explodedFactor * 0.75);
+  // 1. TEARDOWN EXPLODED COMPONENT DISPLACEMENTS (Matching Image 2)
+  headGroup.position.set(0, 0.18 + explodedFactor * 0.45, 0.68 + explodedFactor * 0.85);
+  neckGroup.position.set(0, 0.15 + explodedFactor * 0.25, 0.4 + explodedFactor * 0.45);
+  
+  // Neck bearing beads expand outwards radially
+  neckBeads.forEach((bead, i) => {
+    const ang = (i / 10) * Math.PI * 2;
+    const r = 0.34 + explodedFactor * 0.55;
+    bead.position.set(Math.cos(ang) * r, Math.sin(ang) * r, 0);
+  });
 
-  wingsGroup.position.y = 0.36 + explodedFactor * 0.45;
-  wingLRoot.position.x = -0.35 - explodedFactor * 0.55;
-  wingRRoot.position.x = 0.35 + explodedFactor * 0.55;
+  thoraxTop.position.y = explodedFactor * 0.35;
+  gearCoreGroup.position.set(0, 0.12 + explodedFactor * 0.25, 0);
 
+  // Spin inner gears
+  gears.forEach(g => {
+    if (isPlaying) {
+      g.group.rotation.z += delta * g.dir * g.speed;
+    }
+  });
+
+  // Abdomen segments telescope backward
+  abdomenGroup.position.set(0, 0.08 - explodedFactor * 0.2, -0.72 - explodedFactor * 0.95);
+  abdSegments.forEach((seg, s) => {
+    seg.position.z = -s * (0.22 + explodedFactor * 0.25);
+  });
+
+  // Wings separate laterally
+  wingsGroup.position.y = 0.42 + explodedFactor * 0.5;
+  wingLRoot.position.x = -0.36 - explodedFactor * 0.65;
+  wingRRoot.position.x = 0.36 + explodedFactor * 0.65;
+
+  // Legs explode radially
   legs.forEach(leg => {
-    leg.root.position.x = leg.side * (0.38 + explodedFactor * 0.45);
-    leg.root.position.y = -explodedFactor * 0.25;
+    leg.root.position.x = leg.side * (0.36 + explodedFactor * 0.5);
+    leg.root.position.y = -0.05 - explodedFactor * 0.3;
   });
 
   hardwareGroup.visible = (explodedFactor > 0.05);
   orbitRingsGroup.visible = (explodedFactor > 0.05);
 
-  // --- 2. HOVERING & HIGH-SPEED WING FLAPPING ---
+  // 2. HOVERING & HIGH-SPEED WING FLAPPING
   if (!isExploded) {
-    // Body hover bobbing
-    const hoverY = Math.sin(time * 3.5) * 0.04;
-    const hoverPitch = Math.cos(time * 2.0) * 0.02;
-    const hoverRoll = Math.sin(time * 2.5) * 0.02;
+    // Body hover micro-dynamics
+    const hoverY = Math.sin(time * 3.5) * 0.035;
+    const hoverPitch = Math.cos(time * 2.2) * 0.02;
+    const hoverRoll = Math.sin(time * 2.8) * 0.02;
     beeRoot.position.y = hoverY;
     beeRoot.rotation.set(hoverPitch, 0, hoverRoll);
 
-    // 7.5 Hz wing stroke amplitude ±32°
+    // 7.5 Hz wing stroke amplitude ±32° plus chord pitch
     const strokeAngle = Math.sin(waveOffset) * (32 * Math.PI / 180);
     const featherAngle = Math.cos(waveOffset) * 0.22;
 
@@ -1222,9 +1446,9 @@ function animate() {
     blurFanL.visible = showMotionBlur;
     blurFanR.visible = showMotionBlur;
 
-    // Antenna subtle twitching
-    antL.rotation.z = -0.35 + Math.sin(time * 6) * 0.05;
-    antR.rotation.z = 0.35 + Math.cos(time * 6) * 0.05;
+    // Antenna subtle sensory twitching
+    antL.rotation.z = -0.28 + Math.sin(time * 6) * 0.04;
+    antR.rotation.z = 0.28 + Math.cos(time * 6) * 0.04;
   } else {
     beeRoot.position.set(0, 0, 0);
     beeRoot.rotation.set(0, 0, 0);
@@ -1234,7 +1458,7 @@ function animate() {
     blurFanR.visible = false;
   }
 
-  // Screen Labels
+  // 3. UI & HUD UPDATES
   renderScreenLabels();
   drawWingWave(time);
   updateTelemetryUI(time);
@@ -1252,72 +1476,57 @@ function renderScreenLabels() {
   const w = labelsCanvas.width;
   const h = labelsCanvas.height;
 
-  domLabels.forEach(item => {
-    const pos3D = item.def.getPos();
-    const screenPos = pos3D.clone().project(camera);
+  domLabels.forEach(({ def, el }) => {
+    const pos3D = def.getPos();
+    const p = pos3D.clone().project(camera);
 
-    if (screenPos.z > 1.0) {
-      item.el.style.opacity = '0';
+    // Behind camera check
+    if (p.z > 1.0) {
+      el.style.opacity = '0';
       return;
     }
 
-    const x = (screenPos.x * 0.5 + 0.5) * w;
-    const y = (-screenPos.y * 0.5 + 0.5) * h;
+    const sx = (p.x * 0.5 + 0.5) * w;
+    const sy = (-p.y * 0.5 + 0.5) * h;
 
-    const offsetX = screenPos.x > 0 ? 55 : -140;
-    const offsetY = screenPos.y > 0 ? -35 : 35;
-    const labelX = x + offsetX;
-    const labelY = y + offsetY;
+    el.style.left = `${sx}px`;
+    el.style.top = `${sy}px`;
+    el.style.opacity = '1';
 
-    item.el.style.left = `${labelX}px`;
-    item.el.style.top = `${labelY}px`;
-    item.el.style.opacity = '1';
-
-    labelsCtx.strokeStyle = 'rgba(255, 72, 0, 0.65)';
+    // Draw precision leader line with orange point
+    labelsCtx.strokeStyle = 'rgba(255, 72, 0, 0.4)';
     labelsCtx.lineWidth = 1.2;
-    labelsCtx.setLineDash([2, 2]);
-
     labelsCtx.beginPath();
-    labelsCtx.arc(x, y, 2.5, 0, Math.PI * 2);
+    labelsCtx.arc(sx, sy, 3, 0, Math.PI * 2);
     labelsCtx.fillStyle = '#ff4800';
     labelsCtx.fill();
 
-    labelsCtx.beginPath();
-    labelsCtx.moveTo(x, y);
-    labelsCtx.lineTo(labelX + (screenPos.x > 0 ? 0 : 80), labelY);
+    labelsCtx.moveTo(sx, sy);
+    labelsCtx.lineTo(sx + 10, sy);
     labelsCtx.stroke();
-    labelsCtx.setLineDash([]);
   });
 }
 
 function updateTelemetryUI(time) {
-  const totalSecs = Math.floor(elapsedSimTime);
-  const mm = String(Math.floor(totalSecs / 60)).padStart(2, '0');
-  const ss = String(totalSecs % 60).padStart(2, '0');
-  document.getElementById('val-runtime').textContent = `00:${mm}:${ss}`;
-  document.getElementById('timeline-time').textContent = `${mm}:${ss} / 00:24`;
+  // Update runtime clock
+  const totalSec = Math.floor(elapsedSimTime);
+  const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+  const s = String(totalSec % 60).padStart(2, '0');
+  document.getElementById('val-runtime').textContent = `00:${m}:${s}`;
+  document.getElementById('timeline-time').textContent = `00:${s} / 00:24`;
 
-  const pitchAngle = Math.sin(time * 0.8) * 0.05;
-  const rollAngle = Math.cos(time * 0.6) * 0.6;
-  const gimbalLine = document.getElementById('gimbal-line');
-  gimbalLine.style.transform = `translateY(${pitchAngle * 10}px) rotate(${rollAngle}deg)`;
-  document.getElementById('val-pitch').textContent = `${pitchAngle >= 0 ? '+' : ''}${pitchAngle.toFixed(2)}°`;
-  document.getElementById('val-roll').textContent = `${rollAngle >= 0 ? '+' : ''}${rollAngle.toFixed(2)}°`;
+  // Attitude indicator roll/pitch
+  const rollDeg = (Math.sin(time * 2.8) * 0.57).toFixed(2);
+  const pitchDeg = (Math.cos(time * 2.2) * 0.03).toFixed(2);
+  const hLine = document.getElementById('horizon-line');
+  if (hLine) {
+    hLine.style.transform = `translateY(${pitchDeg * 8}px) rotate(${rollDeg * 12}deg)`;
+  }
 
-  legData.forEach(item => {
-    const valEl = document.getElementById(`servo-val-${item.id}`);
-    const fillEl = document.getElementById(`servo-fill-${item.id}`);
-    if (isExploded) {
-      valEl.textContent = 'DETACHED';
-      valEl.className = 'servo-val detached';
-      fillEl.style.width = '0%';
-    } else {
-      const dynamicVal = Math.min(100, Math.max(20, Math.round(item.val + Math.sin(time * 3 + item.val) * 6)));
-      valEl.textContent = `${dynamicVal}%`;
-      valEl.className = 'servo-val';
-      fillEl.style.width = `${dynamicVal}%`;
-    }
-  });
+  // Active draw power
+  const drawVal = (34.0 + Math.sin(time * 5) * 1.8).toFixed(1);
+  const drawEl = document.getElementById('val-draw');
+  if (drawEl) drawEl.textContent = `${drawVal} W`;
 }
 
-animate();
+requestAnimationFrame(animate);
