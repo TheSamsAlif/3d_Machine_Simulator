@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>MechViz — Interactive 3D Machine Simulators & Explainer Engine</title>
+  <meta name="description" content="Explore real mechanical machines in interactive 3D with live kinematic instrumentation, cutaways, exploded views, and cinematic tours. Built with WebGL & Three.js.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #06080d;
+      --bg-surface: #0c1019;
+      --bg-card: rgba(16, 22, 35, 0.75);
+      --bg-card-hover: rgba(24, 33, 52, 0.85);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(0, 240, 255, 0.3);
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --cyan: #00f0ff;
+      --cyan-glow: rgba(0, 240, 255, 0.35);
+      --blue: #3b82f6;
+      --amber: #f59e0b;
+      --emerald: #10b981;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --font-heading: 'Outfit', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-heading);
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 240, 255, 0.12), transparent 70%),
+        radial-gradient(circle 600px at 85% 30%, rgba(59, 130, 246, 0.08), transparent 60%),
+        radial-gradient(circle 500px at 15% 70%, rgba(16, 185, 129, 0.06), transparent 60%);
+      background-attachment: fixed;
+    }
+
+    /* Top Navigation */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: rgba(6, 8, 13, 0.8);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0.85rem 1.75rem;
+    }
+
+    .nav-inner {
+      max-width: 1360px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #00f0ff 0%, #3b82f6 100%);
+      border-radius: var(--radius-sm);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 20px var(--cyan-glow);
+    }
+
+    .brand-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: #06080d;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .brand-text {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-badge {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      background: rgba(0, 240, 255, 0.12);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--emerald);
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--emerald);
+      animation: pulse-dot 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.55rem 1.15rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid transparent;
+      font-family: inherit;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border-color: var(--border-subtle);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00f0ff 0%, #0088ff 100%);
+      color: #06080d;
+      box-shadow: 0 4px 18px rgba(0, 240, 255, 0.25);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 6px 24px rgba(0, 240, 255, 0.45);
+      transform: translateY(-1px);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1360px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 3rem;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .hero-tagline {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--cyan);
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .hero-title {
+      font-size: clamp(2.4rem, 5vw, 3.8rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    .hero-title span {
+      background: linear-gradient(135deg, #00f0ff 20%, #38bdf8 50%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 700px;
+      line-height: 1.6;
+    }
+
+    /* Simulator Showcase Frame */
+    .viewport-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Control Bar */
+    .viewport-header {
+      background: rgba(14, 18, 28, 0.95);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0.9rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .viewport-meta {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .model-selector {
+      display: flex;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 0.25rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      gap: 0.25rem;
+    }
+
+    .model-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.45rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .model-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .model-btn.active {
+      color: #06080d;
+      background: var(--cyan);
+      box-shadow: 0 0 14px var(--cyan-glow);
+    }
+
+    .mode-toggle {
+      display: flex;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 0.25rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      gap: 0.25rem;
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .mode-btn.active {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--text-main);
+    }
+
+    .viewport-tools {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .tool-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tool-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .tool-btn svg {
+      width: 17px;
+      height: 17px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* 3D Frame */
+    .iframe-wrapper {
+      position: relative;
+      width: 100%;
+      height: clamp(520px, 70vh, 820px);
+      background: #000;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .frame-loader {
+      position: absolute;
+      inset: 0;
+      background: #06080d;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      z-index: 5;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .frame-loader.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid rgba(0, 240, 255, 0.15);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Telemetry & Subsystems Info */
+    .telemetry-bar {
+      background: rgba(10, 14, 22, 0.95);
+      border-top: 1px solid var(--border-subtle);
+      padding: 1.25rem 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .telemetry-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 0.85rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      transition: border-color 0.2s ease;
+    }
+
+    .telemetry-card:hover {
+      border-color: var(--border-accent);
+    }
+
+    .telemetry-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+
+    .telemetry-value {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--cyan);
+      display: flex;
+      align-items: baseline;
+      gap: 0.3rem;
+    }
+
+    .telemetry-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Grid of Key Architecture Features */
+    .features-section {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .section-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .section-title {
+      font-size: 1.85rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 1rem;
+      max-width: 650px;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .feature-card:hover {
+      background: var(--bg-card-hover);
+      transform: translateY(-3px);
+      border-color: rgba(0, 240, 255, 0.2);
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      display: grid;
+      place-items: center;
+      background: rgba(0, 240, 255, 0.08);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+    }
+
+    .feature-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+    }
+
+    .feature-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .feature-text {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.55;
+    }
+
+    /* Code & Quickstart */
+    .code-section {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 2.25rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2.5rem;
+      align-items: center;
+    }
+
+    @media (max-width: 900px) {
+      .code-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .code-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .code-box {
+      background: #05070a;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+    }
+
+    .code-header {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .code-body {
+      padding: 1.25rem;
+      overflow-x: auto;
+      color: #e2e8f0;
+      line-height: 1.7;
+    }
+
+    .code-comment {
+      color: #64748b;
+    }
+
+    .code-cmd {
+      color: var(--cyan);
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(6, 8, 13, 0.95);
+      padding: 2.5rem 1.75rem;
+      margin-top: auto;
+    }
+
+    .footer-inner {
+      max-width: 1360px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+
+    .footer-text {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .footer-text strong {
+      color: var(--text-main);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--cyan);
+    }
+
+    @media (max-width: 768px) {
+      .viewport-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .model-selector {
+        overflow-x: auto;
+      }
+      .telemetry-bar {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="nav-inner">
+      <a href="#" class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <span class="brand-text">MechViz</span>
+        <span class="brand-badge">Engine v1.0</span>
+      </a>
+
+      <div class="nav-actions">
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          <span>60 FPS WebGL Engine</span>
+        </div>
+        <a href="https://github.com/SamsAlif" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Showcase -->
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-tagline">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        AI-Powered 3D Mechanical Simulator
+      </div>
+      <h1 class="hero-title">
+        Transform Any Machine Into an <span>Interactive 3D Simulator</span>
+      </h1>
+      <p class="hero-desc">
+        Real kinematic equations, live instrument gauges, transparent cutaways, and subsystem dissection. Packed into a zero-dependency offline HTML bundle.
+      </p>
+    </section>
+
+    <!-- Simulator Viewport Card -->
+    <section class="viewport-card">
+      <div class="viewport-header">
+        <div class="viewport-meta">
+          <!-- Machine Switcher -->
+          <div class="model-selector" id="modelSelector">
+            <button class="model-btn active" data-model="v8">
+              <span>🏎️</span> V8 Four-Stroke Engine
+            </button>
+            <button class="model-btn" data-model="cessna">
+              <span>🛩️</span> Cessna 337 Landing Gear
+            </button>
+            <button class="model-btn" data-model="strandbeest">
+              <span>🦀</span> Strandbeest Kinetic Walker
+            </button>
+          </div>
+
+          <!-- Mode Switcher -->
+          <div class="mode-toggle" id="modeSelector">
+            <button class="mode-btn active" data-mode="live">🎮 Live Simulator</button>
+            <button class="mode-btn" data-mode="film">🎬 Cinematic Tour</button>
+          </div>
+        </div>
+
+        <!-- Viewport Quick Tools -->
+        <div class="viewport-tools">
+          <button class="tool-btn" id="reloadBtn" title="Reload Simulator">
+            <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </button>
+          <button class="tool-btn" id="openTabBtn" title="Open in Full Window">
+            <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          </button>
+          <button class="tool-btn" id="fullscreenBtn" title="Toggle Fullscreen">
+            <svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Iframe Canvas Viewport -->
+      <div class="iframe-wrapper" id="frameWrapper">
+        <div class="frame-loader" id="frameLoader">
+          <div class="spinner"></div>
+          <p style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--cyan);">Compiling WebGL Scene...</p>
+        </div>
+        <iframe id="simFrame" src="v8-live.html" title="3D Machine Simulator" allow="fullscreen"></iframe>
+      </div>
+
+      <!-- Real-Time Model Telemetry Spec Bar -->
+      <div class="telemetry-bar" id="telemetryBar">
+        <div class="telemetry-card">
+          <span class="telemetry-label">Drive Input</span>
+          <span class="telemetry-value" id="tDrive">Crank Angle <span style="font-size:0.8rem;color:var(--text-muted)">0°–720°</span></span>
+          <span class="telemetry-desc" id="tDriveDesc">Exact 4-stroke thermodynamic cycle</span>
+        </div>
+        <div class="telemetry-card">
+          <span class="telemetry-label">Kinematic Mechanism</span>
+          <span class="telemetry-value" id="tKinematics">Slider-Crank</span>
+          <span class="telemetry-desc" id="tKinematicsDesc">8 pistons + overhead camshaft valve lifts</span>
+        </div>
+        <div class="telemetry-card">
+          <span class="telemetry-label">Dissection Modes</span>
+          <span class="telemetry-value" id="tModes">Glass & Section</span>
+          <span class="telemetry-desc" id="tModesDesc">Transparent cylinder liners & stencil cutaway</span>
+        </div>
+        <div class="telemetry-card">
+          <span class="telemetry-label">Firing Sequence</span>
+          <span class="telemetry-value" id="tSequence">1-8-4-3-6-5-7-2</span>
+          <span class="telemetry-desc" id="tSequenceDesc">Cross-plane counterweighted crankshaft</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture Features -->
+    <section class="features-section">
+      <div class="section-header">
+        <h2 class="section-title">Built for Precision, Speed & Autonomy</h2>
+        <p class="section-desc">
+          Everything required to simulate mechanical systems in real-time, rendered with custom shaders and procedural sound design.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+          </div>
+          <h3 class="feature-title">Standalone Single HTML</h3>
+          <p class="feature-text">
+            Three.js runtime, fonts, shaders, and geometry are compiled into one single file. Zero external requests, offline ready, and instantly shareable.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </div>
+          <h3 class="feature-title">Calculated From First Principles</h3>
+          <p class="feature-text">
+            Parts are driven by explicit geometric equations — linkage circle intersections, rack and pinions, slider-cranks, and spring-damper dynamics.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          </div>
+          <h3 class="feature-title">Automated Guided Tour</h3>
+          <p class="feature-text">
+            When left alone, an intelligent camera director walks viewers through each subsystem, animating angles, annotations, and exploded views.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+          </div>
+          <h3 class="feature-title">Procedural Audio Synthesizer</h3>
+          <p class="feature-text">
+            A Python-based sound effects framework models piston detonations, gear whines, and aerodynamic airflow in sync with timeline cues.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          </div>
+          <h3 class="feature-title">Live Telemetry HUD</h3>
+          <p class="feature-text">
+            Every gauge and readout computes active numbers directly from the physical model: stroke displacement, pressure bar, torque, and RPM.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          </div>
+          <h3 class="feature-title">Playwright 60 FPS Recorder</h3>
+          <p class="feature-text">
+            Deterministic frame-by-frame rendering engine guarantees zero dropped frames, outputting studio-mastered 60 fps videos directly with FFmpeg.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quickstart & CLI Guide -->
+    <section class="code-section">
+      <div class="code-content">
+        <h2 class="section-title">Build Any Custom Machine with MechViz</h2>
+        <p class="section-desc">
+          Point MechViz at any mechanism. It designs the 3D geometry in code, sets up the orbit lighting, hooks up the instrument HUD, and outputs the simulator.
+        </p>
+        <div style="display:flex;gap:0.75rem;">
+          <a href="#modelSelector" class="btn btn-primary">Try The Simulators</a>
+          <a href="https://github.com/SamsAlif" target="_blank" class="btn btn-secondary">Documentation</a>
+        </div>
+      </div>
+
+      <div class="code-box">
+        <div class="code-header">
+          <span>terminal — bash</span>
+          <span>bash</span>
+        </div>
+        <div class="code-body">
+          <span class="code-comment"># 1. Clone & install dependencies</span><br>
+          <span class="code-cmd">git clone</span> https://github.com/SamsAlif/mechviz.git<br>
+          <span class="code-cmd">cd</span> mechviz && <span class="code-cmd">npm install</span><br><br>
+          <span class="code-comment"># 2. Bundle all 3D machines</span><br>
+          <span class="code-cmd">npm run build</span><br><br>
+          <span class="code-comment"># 3. Build your custom mechanism</span><br>
+          <span class="code-cmd">node</span> sims/build.mjs ./my-robot-arm
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-text">
+        © 2026 <strong>MechViz</strong>. Crafted with precision by <strong>Sams Alif</strong>. Released under MIT License.
+      </div>
+      <div class="footer-links">
+        <a href="#modelSelector">V8 Engine</a>
+        <a href="#modelSelector">Cessna 337</a>
+        <a href="#modelSelector">Strandbeest</a>
+        <a href="https://github.com/SamsAlif" target="_blank">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Interactive Logic -->
+  <script>
+    const models = {
+      v8: {
+        name: "V8 Four-Stroke Engine",
+        live: "v8-live.html",
+        film: "v8-film.html",
+        tDrive: "Crank Angle",
+        tDriveSub: "0°–720°",
+        tDriveDesc: "Exact 4-stroke thermodynamic cycle",
+        tKinematics: "Slider-Crank",
+        tKinematicsDesc: "8 pistons + overhead camshaft valve lifts",
+        tModes: "Glass & Section",
+        tModesDesc: "Transparent cylinder liners & stencil cutaway",
+        tSequence: "1-8-4-3-6-5-7-2",
+        tSequenceDesc: "Cross-plane counterweighted crankshaft"
+      },
+      cessna: {
+        name: "Cessna 337 Landing Gear",
+        live: "cessna-live.html",
+        film: "cessna-film.html",
+        tDrive: "Rack Stroke",
+        tDriveSub: "0..201 mm",
+        tDriveDesc: "Linear actuator pushing gear mechanism",
+        tKinematics: "Rack & Pinion",
+        tKinematicsDesc: "32-tooth pinion (module 4 mm) rotated 180°",
+        tModes: "Flight Phases",
+        tModesDesc: "Roll, pitch, tire compression & gear tuck",
+        tSequence: "Unlock → Rotate → Lock",
+        tSequenceDesc: "Mechanical dead-center over-center lock pin"
+      },
+      strandbeest: {
+        name: "Strandbeest Kinetic Walker",
+        live: "strandbeest-live.html",
+        film: "strandbeest-film.html",
+        tDrive: "Wind Power",
+        tDriveSub: "Integrated m/s",
+        tDriveDesc: "Variable wind speed turns central crankshaft",
+        tKinematics: "11 Jansen Linkages",
+        tKinematicsDesc: "Analytical circle-circle intersection solver",
+        tModes: "Leg Phase Array",
+        tModesDesc: "20 legs phased symmetrically on crank",
+        tSequence: "Foot Contact Wave",
+        tSequenceDesc: "Smooth horizontal stride with minimal vertical lift"
+      }
+    };
+
+    let currentModel = 'v8';
+    let currentMode = 'live';
+
+    const simFrame = document.getElementById('simFrame');
+    const frameLoader = document.getElementById('frameLoader');
+    const modelBtns = document.querySelectorAll('#modelSelector .model-btn');
+    const modeBtns = document.querySelectorAll('#modeSelector .mode-btn');
+
+    function updateSim() {
+      frameLoader.classList.add('visible');
+      const data = models[currentModel];
+      const targetUrl = data[currentMode];
+      simFrame.src = targetUrl;
+
+      // Update telemetry
+      document.getElementById('tDrive').innerHTML = `${data.tDrive} <span style="font-size:0.8rem;color:var(--text-muted)">${data.tDriveSub}</span>`;
+      document.getElementById('tDriveDesc').innerText = data.tDriveDesc;
+      document.getElementById('tKinematics').innerText = data.tKinematics;
+      document.getElementById('tKinematicsDesc').innerText = data.tKinematicsDesc;
+      document.getElementById('tModes').innerText = data.tModes;
+      document.getElementById('tModesDesc').innerText = data.tModesDesc;
+      document.getElementById('tSequence').innerText = data.tSequence;
+      document.getElementById('tSequenceDesc').innerText = data.tSequenceDesc;
+    }
+
+    simFrame.addEventListener('load', () => {
+      frameLoader.classList.remove('visible');
+    });
+
+    modelBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        modelBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentModel = btn.dataset.model;
+        updateSim();
+      });
+    });
+
+    modeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        modeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMode = btn.dataset.mode;
+        updateSim();
+      });
+    });
+
+    // Quick Tool handlers
+    document.getElementById('reloadBtn').addEventListener('click', () => {
+      frameLoader.classList.add('visible');
+      simFrame.contentWindow.location.reload();
+    });
+
+    document.getElementById('openTabBtn').addEventListener('click', () => {
+      const data = models[currentModel];
+      window.open(data[currentMode], '_blank');
+    });
+
+    document.getElementById('fullscreenBtn').addEventListener('click', () => {
+      const wrapper = document.getElementById('frameWrapper');
+      if (!document.fullscreenElement) {
+        if (wrapper.requestFullscreen) wrapper.requestFullscreen();
+        else if (wrapper.webkitRequestFullscreen) wrapper.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    });
+  </script>
+</body>
+</html>
