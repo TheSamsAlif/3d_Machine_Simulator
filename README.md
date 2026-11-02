@@ -1,6 +1,9 @@
-# mechviz
+# MechViz — 3D Machine Simulator
 
-An AI-powered skill that transforms any machine or mechanism into a fully interactive 3D simulator — all packed into a single offline HTML page.
+An AI-powered skill and interactive engine that transforms any machine or mechanism into a fully interactive 3D simulator — all packed into a single offline HTML page.
+
+- 🌐 **Live Website**: [https://3d-machine-simulator.vercel.app](https://3d-machine-simulator.vercel.app)
+- 📂 **GitHub Repository**: [https://github.com/TheSamsAlif/3d_Machine_Simulator](https://github.com/TheSamsAlif/3d_Machine_Simulator)
 
 Describe how something works, and it builds a complete visual explainer: the machine runs live in the center, every instrument panel reads real computed values, subsystem buttons open up the internals, and an auto-tour mode guides viewers through the whole thing hands-free.
 
@@ -48,4 +51,4 @@ node sims/build.mjs scorpion-live      # Bionic Scorpio-Rover
 
 ## License
 
-MIT — Sams Alif
+MIT — [TheSamsAlif](https://github.com/TheSamsAlif)
