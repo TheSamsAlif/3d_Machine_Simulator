@@ -22,12 +22,15 @@ Ask your AI coding assistant in plain words:
 
 > Make a visual explainer of a hydraulic excavator arm and record a 20-second video.
 
-Or build one of the 3 bundled examples:
+Or build one of the 6 bundled simulators:
 
 ```
-node sims/build.mjs v8-live          # mechviz-out/dist/v8-live.html
-node sims/build.mjs cessna-live
-node sims/build.mjs strandbeest-live
+node sims/build.mjs v8-live            # V8 Engine
+node sims/build.mjs cessna-live        # Cessna Landing Gear
+node sims/build.mjs strandbeest-live   # Strandbeest Walker
+node sims/build.mjs bee-live           # Robo-Bee Flapping MAV
+node sims/build.mjs octopus-live       # Soft-Robotic Octopus Hydro-Jet
+node sims/build.mjs scorpion-live      # Bionic Scorpio-Rover
 ```
 
 ## What is inside
@@ -36,8 +39,10 @@ node sims/build.mjs strandbeest-live
 |---|---|
 | `SKILL.md` | The instruction set: how a machine is modelled, the visual rules, the review loop. |
 | `sims/kit/` | Runtime engine, stage setup, shader warm-up utilities. |
-| `sims/v8-*`, `sims/cessna-*`, `sims/strandbeest-*` | 3 complete example machines. `-shared` is the model, `-live` the interactive page, `-film` the recorded tour. |
+| `sims/v8-*`, `sims/cessna-*`, `sims/strandbeest-*` | Classic mechanical engineering machines. |
+| `sims/bee-live`, `sims/octopus-live`, `sims/scorpion-live` | Biomimetic & bio-robotic machines (Bee, Octopus, Scorpion). |
 | `sims/build.mjs` | Bundles a machine into one self-contained HTML file with three.js and fonts inlined. |
+| `portal/` | Interactive web portal showcasing all simulators. |
 | `sims/capture.mjs` | Renders the film frame by frame to a 60 fps mp4, or generates review sheets of stills. |
 | `sfx/`, `run_sfx.py` | Procedural audio engine synced to the film's timeline, mastered to −14 LUFS. |
 

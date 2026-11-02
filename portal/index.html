@@ -745,13 +745,22 @@
           <!-- Machine Switcher -->
           <div class="model-selector" id="modelSelector">
             <button class="model-btn active" data-model="v8">
-              <span>🏎️</span> V8 Four-Stroke Engine
+              <span>🏎️</span> V8 Engine
             </button>
             <button class="model-btn" data-model="cessna">
-              <span>🛩️</span> Cessna 337 Landing Gear
+              <span>🛩️</span> Cessna Gear
             </button>
             <button class="model-btn" data-model="strandbeest">
-              <span>🦀</span> Strandbeest Kinetic Walker
+              <span>🦀</span> Strandbeest
+            </button>
+            <button class="model-btn" data-model="bee">
+              <span>🐝</span> Robo-Bee
+            </button>
+            <button class="model-btn" data-model="octopus">
+              <span>🐙</span> Octo-Bot
+            </button>
+            <button class="model-btn" data-model="scorpion">
+              <span>🦂</span> Scorpio-Rover
             </button>
           </div>
 
@@ -923,7 +932,10 @@
         <a href="#modelSelector">V8 Engine</a>
         <a href="#modelSelector">Cessna 337</a>
         <a href="#modelSelector">Strandbeest</a>
-        <a href="https://github.com/SamsAlif" target="_blank">GitHub</a>
+        <a href="#modelSelector">Robo-Bee</a>
+        <a href="#modelSelector">Octo-Bot</a>
+        <a href="#modelSelector">Scorpio-Rover</a>
+        <a href="https://github.com/TheSamsAlif/3d_Machine_Simulator" target="_blank">GitHub</a>
       </div>
     </div>
   </footer>
@@ -972,6 +984,48 @@
         tModesDesc: "20 legs phased symmetrically on crank",
         tSequence: "Foot Contact Wave",
         tSequenceDesc: "Smooth horizontal stride with minimal vertical lift"
+      },
+      bee: {
+        name: "Robo-Bee MAV Flapping Simulator",
+        live: "bee-live.html",
+        film: "bee-live.html",
+        tDrive: "Piezo Actuator",
+        tDriveSub: "120–240 Hz",
+        tDriveDesc: "Resonant dual-crank flapping transmission",
+        tKinematics: "Spatial 4-Bar Linkage",
+        tKinematicsDesc: "Coupled stroke sweep, pitch feathering & figure-8 deviation",
+        tModes: "Vortex & X-Ray",
+        tModesDesc: "Leading-Edge Vortex (LEV) airflow & transparent thorax",
+        tSequence: "Pronation ⇄ Supination",
+        tSequenceDesc: "Delayed stall dynamic lift generation on both half-strokes"
+      },
+      octopus: {
+        name: "Soft-Robotic Octopus Hydro-Jet Simulator",
+        live: "octopus-live.html",
+        film: "octopus-live.html",
+        tDrive: "Fluidic Hydro-Jet",
+        tDriveSub: "185 kPa Pulse",
+        tDriveDesc: "Pneumatic mantle contraction expelling water thrust",
+        tKinematics: "Continuum Hydrostat",
+        tKinematicsDesc: "8 articulated continuum tentacles with traveling sine wave",
+        tModes: "Swim & Floor Crawl",
+        tModesDesc: "Bioluminescent chromatophore skin & suction pad sensors",
+        tSequence: "Intake ➔ Thrust Pulse",
+        tSequenceDesc: "Reactive momentum propulsion with cavitation wake"
+      },
+      scorpion: {
+        name: "Bio-Robotic Scorpion Rover Simulator",
+        live: "scorpion-live.html",
+        film: "scorpion-live.html",
+        tDrive: "Hydraulic Line",
+        tDriveSub: "240 bar Pressure",
+        tDriveDesc: "High-pressure fluidic servos powering legs, tail & chelae",
+        tKinematics: "Octopod Wave Gait",
+        tKinematicsDesc: "8-legged alternating tripod stride with terrain compliance",
+        tModes: "Combat & Strike",
+        tModesDesc: "6-segment hydraulic arched metasoma tail with stinger arc",
+        tSequence: "Pincer Clamp ➔ Sting",
+        tSequenceDesc: "Dual 3-axis hydraulic chelae & high-velocity sting strike"
       }
     };
 
