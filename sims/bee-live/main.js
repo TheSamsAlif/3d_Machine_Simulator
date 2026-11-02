@@ -1,409 +1,897 @@
 import * as THREE from 'three';
 
-// Bionic Robotic Bee (RoboBee Biomimetic MAV Simulator)
-// Features: Dual piezoelectric spatial 4-bar linkage, figure-8 wing trajectories,
-// leading-edge vortex particles, articulated breathing abdomen, compound eye sensors.
+// =========================================================================
+// MELLIS HB-7 · ROBOTIC POLLINATOR MICRO AIR VEHICLE (FIELD SIMULATOR)
+// Exact match to the high-fidelity lab console & 3D teardown visualization
+// =========================================================================
 
-const W = 1600;
-const H = 900;
-
-// Setup App & UI DOM
 const app = document.getElementById('app');
-app.innerHTML = `
-  <div id="ui-container" style="position:absolute;inset:0;pointer-events:none;z-index:10;font-family:'JetBrains Mono',monospace;color:#f1f5f9;">
-    <!-- Top Header Bar -->
-    <div style="position:absolute;top:16px;left:20px;right:20px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="background:rgba(8,12,20,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:8px 18px;display:flex;align-items:center;gap:12px;">
-        <span style="font-size:1.4rem;">🐝</span>
-        <div>
-          <div style="font-weight:700;font-size:1.05rem;letter-spacing:1px;color:#ffd700;">ROBO-BEE · MAV-X4</div>
-          <div style="font-size:0.7rem;color:#94a3b8;letter-spacing:0.5px;">BIOMIMETIC FLAPPING-WING MICRO AERIAL VEHICLE</div>
-        </div>
-      </div>
 
-      <!-- Quick Stats Pill -->
-      <div style="background:rgba(8,12,20,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:8px 16px;display:flex;gap:20px;">
-        <div><span style="color:#94a3b8;font-size:0.65rem;">LIFT/WEIGHT:</span> <b id="ui-lift-ratio" style="color:#10b981;">1.84×</b></div>
-        <div><span style="color:#94a3b8;font-size:0.65rem;">PEAK FREQ:</span> <b id="ui-freq-val" style="color:#ffd700;">120 Hz</b></div>
-        <div><span style="color:#94a3b8;font-size:0.65rem;">VORTEX LEV:</span> <b style="color:#00f0ff;">ACTIVE</b></div>
+// Inject CSS matching the screenshots
+const style = document.createElement('style');
+style.textContent = `
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+  
+  :root {
+    --bg-lab: #f6f4f0;
+    --text-dark: #1a1917;
+    --text-muted: #8c8983;
+    --text-faint: #b8b5ae;
+    --border-line: #e3dfd7;
+    --border-dark: #2a2825;
+    --accent-orange: #ff4800;
+    --accent-orange-bg: #fff0eb;
+    --accent-green: #0ea569;
+    --accent-green-bg: #e6f7ef;
+    --panel-bg: rgba(255, 255, 255, 0.94);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-lab); font-family: 'Inter', sans-serif; color: var(--text-dark); user-select: none; }
+  
+  #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #gl { width: 100%; height: 100%; display: block; cursor: grab; }
+  #gl.grabbing { cursor: grabbing; }
+
+  /* UI Layer */
+  #hud-layer { position: absolute; inset: 0; pointer-events: none; z-index: 20; padding: 18px 24px; display: flex; flex-direction: column; justify-content: space-between; }
+  .interactive { pointer-events: auto; }
+
+  /* Top Bar */
+  .top-bar { display: flex; justify-content: space-between; align-items: flex-start; }
+  .brand-group { display: flex; align-items: stretch; gap: 14px; }
+  .logo-box { background: var(--accent-orange); color: #fff; border-radius: 4px; padding: 6px 12px; display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
+  .logo-box svg { width: 20px; height: 20px; fill: currentColor; }
+  .title-block { display: flex; flex-direction: column; justify-content: center; }
+  .title-tag { font-size: 8.5px; font-weight: 600; letter-spacing: 1.5px; color: var(--text-muted); text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+  .title-main { font-size: 22px; font-weight: 800; letter-spacing: -0.3px; color: var(--text-dark); line-height: 1.1; margin-top: 1px; }
+  .title-main span { color: var(--accent-orange); font-weight: 400; margin-left: 2px; }
+  .title-sub { font-size: 9px; font-weight: 600; letter-spacing: 1.2px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+
+  /* Top Center Specs */
+  .top-center { display: flex; align-items: center; gap: 28px; background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 7px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.03); }
+  .spec-item { display: flex; flex-direction: column; gap: 2px; font-family: 'JetBrains Mono', monospace; }
+  .spec-label { font-size: 8px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+  .spec-val { font-size: 11px; font-weight: 700; color: var(--text-dark); }
+  .lift-load-bar { width: 140px; height: 7px; background: #e8e5de; border-radius: 2px; overflow: hidden; display: flex; gap: 2px; }
+  .lift-seg { flex: 1; height: 100%; background: #d0ccc3; }
+  .lift-seg.fill { background: var(--text-dark); }
+  .status-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--accent-green); background: var(--accent-green-bg); padding: 2px 8px; border-radius: 3px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* Panels Layout */
+  .panels-wrapper { position: absolute; inset: 0; pointer-events: none; }
+  .panel-col-left { position: absolute; left: 24px; top: 96px; width: 220px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
+  .panel-col-right { position: absolute; right: 24px; top: 96px; width: 220px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
+
+  .tech-card { background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 12px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .card-title { font-size: 9px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-dark); display: flex; align-items: center; gap: 6px; }
+  .card-title::before { content: ''; display: inline-block; width: 3px; height: 10px; background: var(--accent-orange); }
+  .card-idx { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; color: var(--text-faint); }
+
+  /* Big Metric Numbers */
+  .metric-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .metric-big { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 800; letter-spacing: -1px; color: var(--text-dark); line-height: 1; }
+  .metric-unit { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+  .metric-sub { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-dark); }
+
+  /* Sine Wave Canvas */
+  .wave-canvas { width: 100%; height: 42px; border-bottom: 1px solid var(--border-line); margin-bottom: 6px; display: block; }
+  .wave-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); }
+
+  /* Battery Gauge */
+  .power-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-line); font-family: 'JetBrains Mono', monospace; }
+  .power-sub { font-size: 7.5px; color: var(--text-muted); text-transform: uppercase; }
+  .power-val { font-size: 10px; font-weight: 700; color: var(--text-dark); }
+  .battery-bars { display: flex; gap: 2px; height: 12px; margin-top: 4px; }
+  .battery-seg { flex: 1; border-radius: 1px; background: #e5e2da; }
+  .battery-seg.fill-red { background: var(--accent-orange); }
+  .battery-seg.fill-green { background: var(--accent-green); }
+
+  /* Leg Servos Progress Rows */
+  .servo-row { display: flex; align-items: center; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9px; margin-bottom: 5px; }
+  .servo-name { width: 22px; font-weight: 700; color: var(--text-dark); }
+  .servo-track { flex: 1; height: 4px; background: #e8e4dc; border-radius: 2px; margin: 0 8px; overflow: hidden; }
+  .servo-fill { height: 100%; background: var(--accent-orange); }
+  .servo-val { width: 28px; text-align: right; font-weight: 600; color: var(--text-dark); }
+
+  /* Right Side Buttons Grid */
+  .btn-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 4px; }
+  .btn-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin-top: 4px; }
+  .tech-btn { background: #fff; border: 1px solid var(--border-line); color: var(--text-dark); font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700; padding: 6px 4px; border-radius: 4px; text-align: center; cursor: pointer; transition: all 0.15s ease; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tech-btn:hover { border-color: var(--text-muted); background: #faf9f6; }
+  .tech-btn.active { background: var(--accent-orange); color: #fff; border-color: var(--accent-orange); }
+
+  /* Subsystems List */
+  .subsystem-row { display: flex; justify-content: space-between; align-items: center; font-family: 'JetBrains Mono', monospace; padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,0.04); }
+  .subsystem-row:last-child { border-bottom: none; }
+  .subsystem-info { display: flex; flex-direction: column; }
+  .subsystem-name { font-size: 8.5px; font-weight: 700; color: var(--text-dark); }
+  .subsystem-detail { font-size: 7px; color: var(--text-muted); text-transform: uppercase; }
+  .subsystem-badge { font-size: 7.5px; font-weight: 700; padding: 2px 5px; border-radius: 2px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .badge-green { background: var(--accent-green-bg); color: var(--accent-green); }
+  .badge-red { background: #fee2e2; color: #dc2626; }
+  .badge-blue { background: #e0f2fe; color: #0284c7; }
+
+  /* Bottom Flight Log / Scrubber */
+  .bottom-bar { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 820px; margin: 0 auto; }
+  .mode-announce { text-align: center; }
+  .mode-announce-tag { font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700; letter-spacing: 1.5px; color: var(--text-muted); text-transform: uppercase; }
+  .mode-announce-title { font-size: 24px; font-weight: 900; letter-spacing: 1px; color: var(--accent-orange); text-transform: uppercase; line-height: 1; margin: 2px 0; }
+  .mode-announce-sub { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); letter-spacing: 1px; }
+
+  .flight-log-box { width: 100%; background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 8px 16px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+  .play-btn { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-orange); color: #fff; border: none; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+  .play-btn svg { width: 12px; height: 12px; fill: currentColor; }
+  .timeline-track { flex: 1; height: 2px; background: #e3dfd7; position: relative; cursor: pointer; }
+  .timeline-progress { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent-orange); width: 65%; }
+  .timeline-handle { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--accent-orange); }
+  .timeline-markers { position: absolute; width: 100%; top: -14px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 7.5px; font-weight: 600; color: var(--text-muted); }
+  .timeline-actions { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); white-space: nowrap; }
+
+  /* 3D Callout Overlays */
+  .callout-label { position: absolute; pointer-events: none; z-index: 15; font-family: 'JetBrains Mono', monospace; font-size: 8.5px; font-weight: 700; color: var(--accent-orange); background: rgba(255,255,255,0.95); border: 1px solid var(--accent-orange); padding: 3px 6px; border-radius: 2px; white-space: nowrap; transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(255,72,0,0.15); display: none; }
+  .callout-label span { display: block; font-size: 7px; color: var(--text-muted); font-weight: 500; }
+`;
+document.head.appendChild(style);
+
+// Build HUD Layer DOM
+const hudContainer = document.createElement('div');
+hudContainer.id = 'hud-layer';
+hudContainer.innerHTML = `
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="brand-group">
+      <div class="logo-box">
+        <svg viewBox="0 0 24 24"><path d="M12 2L4 6v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V6l-8-4z"/></svg>
+        <span>HB-7</span>
+      </div>
+      <div class="title-block">
+        <span class="title-tag">ROBOTIC POLLINATOR · MICRO AIR VEHICLE</span>
+        <div class="title-main">Mellis HB-7<span>/</span></div>
+        <span class="title-sub">FLAPPING-WING DRONE / FIELD SIMULATOR</span>
       </div>
     </div>
 
-    <!-- Left Controls Panel -->
-    <div style="position:absolute;left:20px;top:90px;width:280px;background:rgba(8,12,20,0.85);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px;pointer-events:auto;">
-      <div style="font-size:0.75rem;font-weight:700;color:#ffd700;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:6px;">
-        FLIGHT TRANSMISSION
-      </div>
-
-      <!-- Frequency / Speed Slider -->
-      <div>
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:6px;">
-          <span>WING FLAP SPEED:</span>
-          <span id="speed-label" style="color:#ffd700;font-weight:700;">1.0× (120 Hz)</span>
-        </div>
-        <input type="range" id="speed-slider" min="0.05" max="2.0" step="0.05" value="1.0" style="width:100%;accent-color:#ffd700;cursor:pointer;">
-      </div>
-
-      <!-- Stroke Amplitude Slider -->
-      <div>
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:6px;">
-          <span>STROKE AMPLITUDE:</span>
-          <span id="amp-label" style="color:#00f0ff;font-weight:700;">115°</span>
-        </div>
-        <input type="range" id="amp-slider" min="45" max="135" step="1" value="115" style="width:100%;accent-color:#00f0ff;cursor:pointer;">
-      </div>
-
-      <!-- Dissect / Cutaway Modes -->
-      <div>
-        <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:8px;text-transform:uppercase;">Dissection & View:</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          <button id="btn-xray" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;padding:6px;font-family:inherit;font-size:0.7rem;border-radius:6px;cursor:pointer;">X-Ray Shell</button>
-          <button id="btn-vortex" style="background:rgba(0,240,255,0.15);border:1px solid rgba(0,240,255,0.4);color:#00f0ff;padding:6px;font-family:inherit;font-size:0.7rem;border-radius:6px;cursor:pointer;">Air Vortex</button>
-          <button id="btn-pause" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;padding:6px;font-family:inherit;font-size:0.7rem;border-radius:6px;cursor:pointer;">Pause [Space]</button>
-          <button id="btn-reset" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;padding:6px;font-family:inherit;font-size:0.7rem;border-radius:6px;cursor:pointer;">Reset View</button>
+    <!-- Center Status Badges -->
+    <div class="top-center">
+      <div class="spec-item">
+        <div class="spec-label">LIFT LOAD</div>
+        <div class="lift-load-bar" id="lift-bar">
+          <div class="lift-seg fill"></div><div class="lift-seg fill"></div><div class="lift-seg fill"></div>
+          <div class="lift-seg fill"></div><div class="lift-seg fill"></div><div class="lift-seg fill"></div>
+          <div class="lift-seg"></div><div class="lift-seg"></div><div class="lift-seg"></div><div class="lift-seg"></div>
         </div>
       </div>
+      <div class="spec-item">
+        <span class="spec-label">SIM ID</span>
+        <span class="spec-val">H87-0412</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-label">RUNTIME</span>
+        <span class="spec-val" id="hud-runtime">00:00:21</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-label">STATUS</span>
+        <span class="status-badge" id="hud-status-badge"><span class="status-dot"></span><span id="hud-status-text">HOVER</span></span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-label">OPERATOR</span>
+        <span class="spec-val">LAB 3 - R.K.</span>
+      </div>
+    </div>
+  </div>
 
-      <!-- Camera Presets -->
-      <div>
-        <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:6px;text-transform:uppercase;">Camera Presets:</div>
-        <div style="display:flex;gap:4px;">
-          <button class="cam-btn" data-cam="orbit" style="flex:1;background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.3);color:#ffd700;padding:5px;font-size:0.65rem;border-radius:4px;cursor:pointer;">Orbit</button>
-          <button class="cam-btn" data-cam="top" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;padding:5px;font-size:0.65rem;border-radius:4px;cursor:pointer;">Top Plan</button>
-          <button class="cam-btn" data-cam="front" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;padding:5px;font-size:0.65rem;border-radius:4px;cursor:pointer;">Front View</button>
-          <button class="cam-btn" data-cam="wing" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;padding:5px;font-size:0.65rem;border-radius:4px;cursor:pointer;">Wing Macro</button>
+  <!-- PANELS COLUMN (LEFT & RIGHT) -->
+  <div class="panels-wrapper">
+    <!-- LEFT COLUMN -->
+    <div class="panel-col-left">
+      <!-- 01 WING BEAT -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">WING BEAT</span>
+          <span class="card-idx">01</span>
+        </div>
+        <div class="metric-row">
+          <div>
+            <span class="metric-big" id="val-freq">7.5</span>
+            <span class="metric-unit">HZ</span>
+            <div style="font-size:7px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">STROKE FREQUENCY</div>
+          </div>
+          <div style="text-align:right;">
+            <span class="metric-sub" id="val-amp">±32°</span>
+            <div style="font-size:7px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">AMPLITUDE</div>
+          </div>
+        </div>
+        <canvas class="wave-canvas" id="wing-wave"></canvas>
+        <div class="wave-meta">
+          <span>PLAYBACK <b style="color:var(--text-dark)" id="val-playback">1.0×</b></span>
+          <span>SHUTTER 1/60</span>
+        </div>
+      </div>
+
+      <!-- 02 POWER -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">POWER</span>
+          <span class="card-idx">02</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <span class="metric-big" id="val-battery">80</span><span class="metric-unit">%</span>
+            <div style="font-size:7px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">BATTERY</div>
+          </div>
+          <div class="battery-bars" style="width:100px;">
+            <div class="battery-seg fill-red"></div>
+            <div class="battery-seg fill-red"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg fill-green"></div>
+            <div class="battery-seg"></div>
+          </div>
+        </div>
+        <div class="power-stats">
+          <div><div class="power-sub">DRAW</div><div class="power-val" id="val-draw">34.0 W</div></div>
+          <div><div class="power-sub">CELL</div><div class="power-val">3.70 V</div></div>
+          <div><div class="power-sub">MOTOR</div><div class="power-val" id="val-temp">41 °C</div></div>
+        </div>
+      </div>
+
+      <!-- 03 LEG SERVOS -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">LEG SERVOS</span>
+          <span class="card-idx">03</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:7.5px;color:var(--text-muted);margin-bottom:8px;font-family:'JetBrains Mono',monospace;">
+          <span>LOAD PER LEG</span>
+          <span class="subsystem-badge badge-green" id="leg-badge">ACTIVE</span>
+        </div>
+        <div id="servo-list">
+          <div class="servo-row">
+            <span class="servo-name">L1</span>
+            <div class="servo-track"><div class="servo-fill" style="width:57%;"></div></div>
+            <span class="servo-val" id="servo-l1">57%</span>
+          </div>
+          <div class="servo-row">
+            <span class="servo-name">L2</span>
+            <div class="servo-track"><div class="servo-fill" style="width:74%;"></div></div>
+            <span class="servo-val" id="servo-l2">74%</span>
+          </div>
+          <div class="servo-row">
+            <span class="servo-name">L3</span>
+            <div class="servo-track"><div class="servo-fill" style="width:63%;"></div></div>
+            <span class="servo-val" id="servo-l3">63%</span>
+          </div>
+          <div class="servo-row">
+            <span class="servo-name">R1</span>
+            <div class="servo-track"><div class="servo-fill" style="width:54%;"></div></div>
+            <span class="servo-val" id="servo-r1">54%</span>
+          </div>
+          <div class="servo-row">
+            <span class="servo-name">R2</span>
+            <div class="servo-track"><div class="servo-fill" style="width:73%;"></div></div>
+            <span class="servo-val" id="servo-r2">73%</span>
+          </div>
+          <div class="servo-row">
+            <span class="servo-name">R3</span>
+            <div class="servo-track"><div class="servo-fill" style="width:63%;"></div></div>
+            <span class="servo-val" id="servo-r3">63%</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Bottom Right Telemetry Box -->
-    <div style="position:absolute;right:20px;bottom:20px;width:320px;background:rgba(8,12,20,0.85);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;">
-      <div style="font-size:0.75rem;font-weight:700;color:#00f0ff;letter-spacing:1px;display:flex;justify-content:space-between;">
-        <span>KINEMATIC TELEMETRY</span>
-        <span style="color:#10b981;">SYNC 60 FPS</span>
+    <!-- RIGHT COLUMN -->
+    <div class="panel-col-right">
+      <!-- 04 FLIGHT / ATTITUDE -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">FLIGHT</span>
+          <span class="card-idx">04</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+          <!-- Gimbal horizon dial -->
+          <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border-line);background:#faf8f5;position:relative;display:grid;place-items:center;overflow:hidden;">
+            <div id="horizon-line" style="position:absolute;width:120%;height:2px;background:var(--accent-orange);transform:rotate(2deg);"></div>
+            <div style="width:4px;height:4px;border-radius:50%;background:var(--text-dark);"></div>
+          </div>
+          <div style="flex:1;font-family:'JetBrains Mono',monospace;font-size:8px;">
+            <div style="display:flex;justify-content:space-between;"><span>ALT AGL</span><b id="val-alt">144.0 MM</b></div>
+            <div style="display:flex;justify-content:space-between;"><span>V/S</span><b id="val-vs">+0.6 MM/S</b></div>
+            <div style="display:flex;justify-content:space-between;"><span>PITCH</span><b>+0.03°</b></div>
+            <div style="display:flex;justify-content:space-between;"><span>ROLL</span><b>-0.57°</b></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding-top:4px;border-top:1px solid var(--border-line);font-family:'JetBrains Mono',monospace;font-size:7.5px;color:var(--text-muted);">
+          <span>HOLD: <b style="color:var(--text-dark)">POSITION</b></span>
+          <span>AIRSPEED: <b style="color:var(--text-dark)">0.00 M/S</b></span>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.75rem;">
-        <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-          <div style="color:#94a3b8;font-size:0.65rem;">LIFT FORCE:</div>
-          <div id="stat-lift" style="font-size:0.95rem;font-weight:700;color:#10b981;">142.5 mN</div>
+
+      <!-- 05 ASSEMBLIES -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">ASSEMBLIES</span>
+          <span class="card-idx">05</span>
         </div>
-        <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-          <div style="color:#94a3b8;font-size:0.65rem;">PIEZO POWER:</div>
-          <div id="stat-power" style="font-size:0.95rem;font-weight:700;color:#ffd700;">385 mW</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-          <div style="color:#94a3b8;font-size:0.65rem;">PITCH (AOA):</div>
-          <div id="stat-aoa" style="font-size:0.95rem;font-weight:700;color:#00f0ff;">±42.0°</div>
-        </div>
-        <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-          <div style="color:#94a3b8;font-size:0.65rem;">THORAX TEMP:</div>
-          <div id="stat-temp" style="font-size:0.95rem;font-weight:700;color:#e2e8f0;">38.4 °C</div>
+        <div class="btn-grid-3">
+          <button class="tech-btn active" data-assembly="hero">HERO</button>
+          <button class="tech-btn" data-assembly="optics">OPTICS</button>
+          <button class="tech-btn" data-assembly="wing">WING</button>
+          <button class="tech-btn" data-assembly="leg">LEG L2</button>
+          <button class="tech-btn" data-assembly="thorax">THORAX</button>
+          <button class="tech-btn" data-assembly="abdomen">ABDOMEN</button>
         </div>
       </div>
-      <div style="font-size:0.65rem;color:#64748b;line-height:1.4;">
-        *Left Click + Drag: Orbit | Right Click / Two-Finger: Pan | Scroll: Zoom
+
+      <!-- 06 DISPLAY CONTROLS -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">DISPLAY</span>
+          <span class="card-idx">06</span>
+        </div>
+        <div class="btn-grid-2">
+          <button class="tech-btn" id="btn-labels">LABELS</button>
+          <button class="tech-btn" id="btn-exploded">EXPLODED</button>
+          <button class="tech-btn" id="btn-motion">MOTION BLUR</button>
+          <button class="tech-btn" id="btn-turntable">TURNTABLE</button>
+        </div>
+      </div>
+
+      <!-- 07 SUBSYSTEMS -->
+      <div class="tech-card">
+        <div class="card-header">
+          <span class="card-title">SUBSYSTEMS</span>
+          <span class="card-idx">07</span>
+        </div>
+        <div class="subsystem-row">
+          <div class="subsystem-info">
+            <span class="subsystem-name">01 OPTIC HEAD</span>
+            <span class="subsystem-detail">2 x 18 MM LENS · AMBER IR</span>
+          </div>
+          <span class="subsystem-badge badge-green" id="sub-01">TRACKING</span>
+        </div>
+        <div class="subsystem-row">
+          <div class="subsystem-info">
+            <span class="subsystem-name">02 NECK BEARING</span>
+            <span class="subsystem-detail">10-SEGMENT COLLAR</span>
+          </div>
+          <span class="subsystem-badge badge-green" id="sub-02">LOCKED</span>
+        </div>
+        <div class="subsystem-row">
+          <div class="subsystem-info">
+            <span class="subsystem-name">03 THORAX DRIVE</span>
+            <span class="subsystem-detail">3 GEARS · 11 ACTUATORS</span>
+          </div>
+          <span class="subsystem-badge badge-blue" id="sub-03">ENGAGED</span>
+        </div>
+        <div class="subsystem-row">
+          <div class="subsystem-info">
+            <span class="subsystem-name">04 WING ROOTS</span>
+            <span class="subsystem-detail">4 HINGES · 7.5 HZ CRANK</span>
+          </div>
+          <span class="subsystem-badge badge-green" id="sub-04">7.5 HZ</span>
+        </div>
+        <div class="subsystem-row">
+          <div class="subsystem-info">
+            <span class="subsystem-name">05 LEG SERVOS</span>
+            <span class="subsystem-detail">6 LEGS · 3 JOINTS</span>
+          </div>
+          <span class="subsystem-badge badge-green" id="sub-05">ACTIVE</span>
+        </div>
+        <div class="subsystem-row">
+          <div class="subsystem-info">
+            <span class="subsystem-name">06 ABDOMEN CAPSULE</span>
+            <span class="subsystem-detail">GEAR TRAIN · RETURN SPRING</span>
+          </div>
+          <span class="subsystem-badge badge-green" id="sub-06">SEALED</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR: FLIGHT LOG & SCRUBBER -->
+  <div class="bottom-bar">
+    <div class="mode-announce">
+      <div class="mode-announce-tag">FLIGHT MODE</div>
+      <div class="mode-announce-title" id="hud-flight-mode">HOVER</div>
+      <div class="mode-announce-sub" id="hud-flight-desc">STATION KEEPING · 144 MM AGL</div>
+    </div>
+
+    <div class="flight-log-box interactive">
+      <button class="play-btn" id="hud-play-btn">
+        <svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
+      </button>
+      <div class="timeline-track" id="timeline-track">
+        <div class="timeline-markers">
+          <span>TAKE-OFF</span>
+          <span id="timeline-state">OPERATOR · HERO · RELEASE</span>
+          <span>LAND</span>
+        </div>
+        <div class="timeline-progress" id="timeline-progress"></div>
+        <div class="timeline-handle" id="timeline-handle"></div>
+      </div>
+      <div class="timeline-actions">
+        <span id="time-current">00:21</span> / 00:24 &nbsp;·&nbsp; 8 OPERATOR ACTIONS
       </div>
     </div>
   </div>
 `;
+app.appendChild(hudContainer);
 
-// Three.js Scene Setup
+// 3D Canvas
+const canvasContainer = document.createElement('div');
+canvasContainer.id = 'canvas-container';
 const canvas = document.createElement('canvas');
 canvas.id = 'gl';
-canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none;cursor:grab;';
-app.appendChild(canvas);
+canvasContainer.appendChild(canvas);
+app.appendChild(canvasContainer);
 
-const renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
+// -------------------------------------------------------------------------
+// THREE.JS SETUP & STUDIO LIGHTING
+// -------------------------------------------------------------------------
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: false});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#06080d');
-scene.fog = new THREE.FogExp2('#06080d', 0.012);
+scene.background = new THREE.Color('#f6f4f0');
+scene.fog = new THREE.FogExp2('#f6f4f0', 0.008);
 
-const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 1000);
-camera.position.set(22, 14, 28);
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(20, 12, 26);
 
-// Lights
-const ambLight = new THREE.AmbientLight('#ffffff', 0.8);
+// Clean warm studio lighting matching the render
+const ambLight = new THREE.AmbientLight('#ffffff', 1.4);
 scene.add(ambLight);
 
-const keyLight = new THREE.DirectionalLight('#ffd700', 3.0);
-keyLight.position.set(15, 30, 20);
+const keyLight = new THREE.DirectionalLight('#ffffff', 2.8);
+keyLight.position.set(25, 35, 20);
 keyLight.castShadow = true;
+keyLight.shadow.mapSize.width = 2048;
+keyLight.shadow.mapSize.height = 2048;
+keyLight.shadow.camera.near = 0.5;
+keyLight.shadow.camera.far = 100;
+keyLight.shadow.bias = -0.0001;
 scene.add(keyLight);
 
-const rimLight = new THREE.DirectionalLight('#00f0ff', 2.0);
-rimLight.position.set(-20, -10, -20);
-scene.add(rimLight);
-
-const fillLight = new THREE.PointLight('#3b82f6', 1.5, 50);
-fillLight.position.set(0, -10, 15);
+const fillLight = new THREE.DirectionalLight('#fcefe8', 1.2);
+fillLight.position.set(-20, 10, -15);
 scene.add(fillLight);
 
-// Ground Grid
-const grid = new THREE.GridHelper(80, 40, '#00f0ff', 'rgba(255,255,255,0.05)');
-grid.position.y = -12;
-scene.add(grid);
+const topSoftLight = new THREE.DirectionalLight('#ffffff', 1.0);
+topSoftLight.position.set(0, 40, 0);
+scene.add(topSoftLight);
+
+// Subtle Ground Shadow Floor
+const groundGeo = new THREE.PlaneGeometry(120, 120);
+const groundMat = new THREE.ShadowMaterial({opacity: 0.08});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -6.2;
+ground.receiveShadow = true;
+scene.add(ground);
 
 // -------------------------------------------------------------------------
-// BUILD BIONIC BEE 3D MODEL
+// MATERIALS PALETTE (Mellis White Ceramic, Orange Accent & Black Mechanics)
 // -------------------------------------------------------------------------
-const beeGroup = new THREE.Group();
-scene.add(beeGroup);
+const matWhiteShell = new THREE.MeshStandardMaterial({
+  color: 0xfaf8f5,
+  roughness: 0.28,
+  metalness: 0.1,
+  envMapIntensity: 1.0
+});
 
-// Materials
-const matCarbon = new THREE.MeshStandardMaterial({
-  color: 0x181a20,
-  roughness: 0.35,
+const matOrangeRing = new THREE.MeshStandardMaterial({
+  color: 0xff4800,
+  roughness: 0.25,
+  metalness: 0.4
+});
+
+const matDarkMetal = new THREE.MeshStandardMaterial({
+  color: 0x1a1918,
+  roughness: 0.4,
   metalness: 0.85
 });
 
-const matGold = new THREE.MeshStandardMaterial({
-  color: 0xf59e0b,
-  roughness: 0.25,
+const matChrome = new THREE.MeshStandardMaterial({
+  color: 0xe2e8f0,
+  roughness: 0.15,
   metalness: 0.95
 });
 
-const matYellowStripe = new THREE.MeshStandardMaterial({
-  color: 0xffcc00,
-  roughness: 0.3,
-  metalness: 0.5,
-  emissive: 0x332200
-});
-
-const matEye = new THREE.MeshStandardMaterial({
-  color: 0x00f0ff,
-  roughness: 0.1,
+const matLens = new THREE.MeshStandardMaterial({
+  color: 0x0a0908,
+  roughness: 0.05,
   metalness: 0.9,
-  emissive: 0x006688,
-  emissiveIntensity: 0.8
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.1
 });
 
-const matWing = new THREE.MeshPhysicalMaterial({
+const matWingMesh = new THREE.MeshPhysicalMaterial({
   color: 0xffffff,
-  transmission: 0.92,
-  opacity: 1,
+  transmission: 0.88,
+  opacity: 0.9,
   transparent: true,
   roughness: 0.15,
-  ior: 1.52,
-  metalness: 0.1,
-  thickness: 0.05,
+  ior: 1.5,
+  thickness: 0.08,
   side: THREE.DoubleSide
 });
 
 const matWingVein = new THREE.LineBasicMaterial({
-  color: 0x00f0ff,
+  color: 0x2a2825,
   transparent: true,
-  opacity: 0.8
+  opacity: 0.65
 });
 
-const matInternal = new THREE.MeshStandardMaterial({
-  color: 0x10b981,
-  roughness: 0.3,
-  metalness: 0.9,
-  emissive: 0x044020
-});
+// -------------------------------------------------------------------------
+// ASSEMBLE MELLIS HB-7 ROBOTIC BEE MODEL (WITH EXPLODED TEARDOWN CAPABILITY)
+// -------------------------------------------------------------------------
+const beeRoot = new THREE.Group();
+beeRoot.position.set(0, 0, 0);
+scene.add(beeRoot);
 
-// 1. Thorax (Center Actuator Housing)
-const thoraxGeo = new THREE.CylinderGeometry(2.4, 2.7, 5.5, 24);
-thoraxGeo.rotateX(Math.PI / 2);
-const thoraxMesh = new THREE.Mesh(thoraxGeo, matCarbon);
-thoraxMesh.castShadow = true;
-beeGroup.add(thoraxMesh);
-
-// Thorax Gold Reinforcement Rings
-const ringGeo = new THREE.TorusGeometry(2.8, 0.18, 16, 32);
-const ring1 = new THREE.Mesh(ringGeo, matGold);
-ring1.position.z = -1.2;
-beeGroup.add(ring1);
-const ring2 = ring1.clone();
-ring2.position.z = 1.2;
-beeGroup.add(ring2);
-
-// Internal Piezo Electric Motor Plates (visible in X-Ray)
-const motorGroup = new THREE.Group();
-for (let i = 0; i < 4; i++) {
-  const plateGeo = new THREE.BoxGeometry(0.2, 3.2, 1.8);
-  const plate = new THREE.Mesh(plateGeo, matInternal);
-  plate.position.x = (i - 1.5) * 0.7;
-  motorGroup.add(plate);
+// Exploded offsets registry
+const explodedParts = [];
+function registerExploded(mesh, vector, label = '', detail = '') {
+  explodedParts.push({mesh, basePos: mesh.position.clone(), explodeVec: vector, label, detail});
 }
-beeGroup.add(motorGroup);
 
-// 2. Head with Compound Eyes & Antennae
-const headGroup = new THREE.Group();
-headGroup.position.set(0, 0.4, 3.8);
+// 1. HEAD & OPTIC ASSEMBLY
+const headAssembly = new THREE.Group();
+headAssembly.position.set(0, 0.4, 4.2);
 
-const headGeo = new THREE.SphereGeometry(1.8, 24, 24);
-headGeo.scale(1, 0.9, 1.1);
-const headMesh = new THREE.Mesh(headGeo, matCarbon);
-headGroup.add(headMesh);
+// White Dome Shell
+const headShell = new THREE.Mesh(new THREE.SphereGeometry(2.4, 32, 32), matWhiteShell);
+headShell.scale.set(1.0, 0.95, 1.1);
+headShell.castShadow = true;
+headAssembly.add(headShell);
 
-// Eyes (Left & Right)
-const eyeGeo = new THREE.SphereGeometry(1.0, 20, 20);
-eyeGeo.scale(0.8, 1.4, 1.2);
-const eyeL = new THREE.Mesh(eyeGeo, matEye);
-eyeL.position.set(-1.2, 0.5, 0.4);
-eyeL.rotation.set(0.3, -0.4, 0.3);
-headGroup.add(eyeL);
+// Large Optic Lens Eyepiece with Orange Bezel Ring
+const eyeBezel = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.25, 20, 36), matOrangeRing);
+eyeBezel.position.set(0, 0.2, 2.3);
+headAssembly.add(eyeBezel);
 
-const eyeR = eyeL.clone();
-eyeR.position.x = 1.2;
-eyeR.rotation.set(0.3, 0.4, -0.3);
-headGroup.add(eyeR);
+const eyeLens = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.4, 32), matLens);
+eyeLens.rotateX(Math.PI / 2);
+eyeLens.position.set(0, 0.2, 2.3);
+headAssembly.add(eyeLens);
 
-// Antennae
-function createAntenna(sign) {
+// Dual Antenna Probes
+function createAntenna(side) {
   const g = new THREE.Group();
-  const c1 = new THREE.CylinderGeometry(0.08, 0.08, 1.8);
-  const m1 = new THREE.Mesh(c1, matGold);
-  m1.position.y = 0.9;
-  g.add(m1);
-  const c2 = new THREE.CylinderGeometry(0.06, 0.08, 2.0);
-  const m2 = new THREE.Mesh(c2, matGold);
-  m2.position.set(0, 1.8 + 0.9, 0.4);
-  m2.rotation.x = -0.5;
-  g.add(m2);
-  g.position.set(sign * 0.7, 1.4, 1.2);
-  g.rotation.set(0.4, sign * 0.3, sign * 0.2);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.2, 12), matDarkMetal);
+  stem.position.y = 1.6;
+  g.add(stem);
+  const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.8, 16), matOrangeRing);
+  tip.position.y = 3.2;
+  g.add(tip);
+  g.position.set(side * 0.9, 1.8, 1.2);
+  g.rotation.set(-0.2, side * 0.2, side * 0.35);
   return g;
 }
 const antL = createAntenna(-1);
 const antR = createAntenna(1);
-headGroup.add(antL, antR);
-beeGroup.add(headGroup);
+headAssembly.add(antL, antR);
+beeRoot.add(headAssembly);
+registerExploded(headAssembly, new THREE.Vector3(0, 0.8, 6.0), 'OPTIC HEAD', '2x LENS · AMBER IR');
 
-// 3. Segmented Abdomen (Bionic Stripes & Stinger)
+// 2. NECK BEARING COLLAR
+const neckGroup = new THREE.Group();
+neckGroup.position.set(0, 0.2, 2.5);
+const neckRing = new THREE.Mesh(new THREE.TorusGeometry(2.1, 0.3, 16, 32), matOrangeRing);
+neckGroup.add(neckRing);
+for (let i = 0; i < 10; i++) {
+  const angle = (i / 10) * Math.PI * 2;
+  const bead = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), matChrome);
+  bead.position.set(Math.cos(angle) * 2.1, Math.sin(angle) * 2.1, 0);
+  neckGroup.add(bead);
+}
+beeRoot.add(neckGroup);
+registerExploded(neckGroup, new THREE.Vector3(0, 0.5, 3.2), 'NECK BEARING', '10-SEGMENT COLLAR');
+
+// 3. CENTRAL THORAX & DRIVE GEAR CORE
+const thoraxGroup = new THREE.Group();
+thoraxGroup.position.set(0, 0, 0);
+
+// Outer White Pod Shell
+const thoraxShell = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.9, 4.2, 32), matWhiteShell);
+thoraxShell.rotateX(Math.PI / 2);
+thoraxShell.castShadow = true;
+thoraxGroup.add(thoraxShell);
+
+// Orange Circumference Stripe Rings
+const tRing1 = new THREE.Mesh(new THREE.TorusGeometry(2.95, 0.14, 16, 40), matOrangeRing);
+tRing1.position.z = -1.2;
+thoraxGroup.add(tRing1);
+const tRing2 = tRing1.clone();
+tRing2.position.z = 1.2;
+thoraxGroup.add(tRing2);
+
+// Dense Inner Mechanical Core (Visible in exploded view)
+const gearCore = new THREE.Group();
+for (let i = 0; i < 5; i++) {
+  const gMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.6 - i * 0.2, 1.6 - i * 0.2, 0.35, 24), matDarkMetal);
+  gMesh.rotateX(Math.PI / 2);
+  gMesh.position.z = (i - 2) * 0.65;
+  gearCore.add(gMesh);
+}
+thoraxGroup.add(gearCore);
+beeRoot.add(thoraxGroup);
+registerExploded(thoraxGroup, new THREE.Vector3(0, 0, 0), 'THORAX DRIVE', '3 GEARS · 11 ACTUATORS');
+
+// 4. ABDOMEN CAPSULE
 const abdomenGroup = new THREE.Group();
-abdomenGroup.position.set(0, -0.2, -3.2);
+abdomenGroup.position.set(0, -0.2, -4.0);
 
-const segCount = 6;
-const segMeshes = [];
-for (let i = 0; i < segCount; i++) {
-  const t = i / (segCount - 1);
-  const radius = Math.sin(t * Math.PI) * 2.2 + 0.9;
-  const length = 1.5;
-  const segGeo = new THREE.CylinderGeometry(radius * 0.9, radius, length, 24);
-  segGeo.rotateX(Math.PI / 2);
-  const mat = (i % 2 === 0) ? matYellowStripe : matCarbon;
-  const segMesh = new THREE.Mesh(segGeo, mat);
-  segMesh.position.z = -i * 1.35;
-  segMeshes.push(segMesh);
-  abdomenGroup.add(segMesh);
-}
+const abdShell = new THREE.Mesh(new THREE.SphereGeometry(2.8, 32, 32), matWhiteShell);
+abdShell.scale.set(0.95, 0.95, 1.8);
+abdShell.castShadow = true;
+abdomenGroup.add(abdShell);
 
-// Micro Stinger Needle
-const stingerGeo = new THREE.ConeGeometry(0.35, 2.2, 16);
-stingerGeo.rotateX(-Math.PI / 2);
-const stingerMesh = new THREE.Mesh(stingerGeo, matGold);
-stingerMesh.position.z = -segCount * 1.35 - 0.5;
-abdomenGroup.add(stingerMesh);
-beeGroup.add(abdomenGroup);
+const abdRing = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.18, 16, 32), matOrangeRing);
+abdRing.position.z = 1.2;
+abdomenGroup.add(abdRing);
 
-// 4. Six Robotic Multi-Jointed Legs
-function createLeg(side, index) {
-  const leg = new THREE.Group();
-  const c1 = new THREE.CylinderGeometry(0.14, 0.12, 2.5);
-  const femur = new THREE.Mesh(c1, matCarbon);
-  femur.position.y = -1.25;
-  leg.add(femur);
+const stinger = new THREE.Mesh(new THREE.ConeGeometry(0.35, 2.4, 16), matDarkMetal);
+stinger.rotateX(-Math.PI / 2);
+stinger.position.z = -5.0;
+abdomenGroup.add(stinger);
 
-  const tibiaGroup = new THREE.Group();
-  tibiaGroup.position.y = -2.5;
-  const c2 = new THREE.CylinderGeometry(0.1, 0.07, 3.2);
-  const tibia = new THREE.Mesh(c2, matGold);
-  tibia.position.y = -1.6;
-  tibiaGroup.add(tibia);
-  tibiaGroup.rotation.z = side * 0.8;
-  leg.add(tibiaGroup);
+beeRoot.add(abdomenGroup);
+registerExploded(abdomenGroup, new THREE.Vector3(0, -0.5, -6.5), 'ABDOMEN CAPSULE', 'GEAR TRAIN · RETURN SPRING');
 
-  const zPos = 1.2 - index * 1.4;
-  leg.position.set(side * 2.2, -1.2, zPos);
-  leg.rotation.set(-0.2 + index * 0.2, 0, -side * 0.6);
-  return leg;
-}
-
-for (let i = 0; i < 3; i++) {
-  beeGroup.add(createLeg(-1, i));
-  beeGroup.add(createLeg(1, i));
-}
-
-// 5. High-Frequency Flapping Wings (Forewings & Hindwings)
-function createWingMesh(scaleX, scaleZ) {
+// 5. FOUR DELICATE HIGH-FREQUENCY WINGS
+function createVeinedWing(scaleX, scaleZ) {
   const shape = new THREE.Shape();
   shape.moveTo(0, 0);
-  shape.bezierCurveTo(scaleX * 0.4, scaleZ * 0.3, scaleX * 0.8, scaleZ * 0.8, scaleX * 1.0, scaleZ * 0.95);
-  shape.bezierCurveTo(scaleX * 1.1, scaleZ * 0.7, scaleX * 0.9, scaleZ * 0.2, scaleX * 0.3, 0);
+  shape.bezierCurveTo(scaleX * 0.3, scaleZ * 0.2, scaleX * 0.7, scaleZ * 0.7, scaleX * 1.0, scaleZ * 0.95);
+  shape.bezierCurveTo(scaleX * 1.1, scaleZ * 0.75, scaleX * 0.9, scaleZ * 0.2, scaleX * 0.35, 0);
   shape.bezierCurveTo(scaleX * 0.1, -scaleZ * 0.1, 0, 0, 0, 0);
 
   const geo = new THREE.ShapeGeometry(shape, 24);
-  const mesh = new THREE.Mesh(geo, matWing);
-  mesh.rotateX(-Math.PI / 2);
+  const wing = new THREE.Mesh(geo, matWingMesh);
+  wing.rotateX(-Math.PI / 2);
 
-  // Structural Wing Veins
+  // Geometric grid veins
   const pts = [];
-  pts.push(new THREE.Vector3(0, 0, 0));
-  pts.push(new THREE.Vector3(scaleX * 0.6, 0, scaleZ * 0.6));
-  pts.push(new THREE.Vector3(scaleX * 0.95, 0, scaleZ * 0.9));
-  const veinGeo = new THREE.BufferGeometry().setFromPoints(pts);
-  const veinLine = new THREE.Line(veinGeo, matWingVein);
-  mesh.add(veinLine);
-
-  return mesh;
+  pts.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(scaleX * 0.6, 0, scaleZ * 0.6));
+  pts.push(new THREE.Vector3(scaleX * 0.95, 0, scaleZ * 0.9), new THREE.Vector3(scaleX * 0.4, 0, scaleZ * 0.3));
+  pts.push(new THREE.Vector3(scaleX * 0.8, 0, scaleZ * 0.5));
+  const vLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), matWingVein);
+  wing.add(vLine);
+  return wing;
 }
 
-// Left Wings Hinge
-const wingHingeL = new THREE.Group();
-wingHingeL.position.set(-1.8, 1.8, 0.4);
-const forewingL = createWingMesh(9.5, -4.5);
-const hindwingL = createWingMesh(6.0, -3.2);
-hindwingL.position.set(0, -0.15, -1.2);
-wingHingeL.add(forewingL, hindwingL);
-beeGroup.add(wingHingeL);
+const wingLRoot = new THREE.Group();
+wingLRoot.position.set(-2.2, 1.8, 0.2);
+const forewingL = createVeinedWing(12.0, -4.5);
+wingLRoot.add(forewingL);
+beeRoot.add(wingLRoot);
+registerExploded(wingLRoot, new THREE.Vector3(-6.0, 3.5, 0), 'WING HINGE L', 'QUICK RELEASE');
 
-// Right Wings Hinge
-const wingHingeR = new THREE.Group();
-wingHingeR.position.set(1.8, 1.8, 0.4);
-const forewingR = createWingMesh(-9.5, -4.5);
-const hindwingR = createWingMesh(-6.0, -3.2);
-hindwingR.position.set(0, -0.15, -1.2);
-wingHingeR.add(forewingR, hindwingR);
-beeGroup.add(wingHingeR);
+const wingRRoot = new THREE.Group();
+wingRRoot.position.set(2.2, 1.8, 0.2);
+const forewingR = createVeinedWing(-12.0, -4.5);
+wingRRoot.add(forewingR);
+beeRoot.add(wingRRoot);
+registerExploded(wingRRoot, new THREE.Vector3(6.0, 3.5, 0), 'WING HINGE R', 'QUICK RELEASE');
 
-// 6. Airflow Leading-Edge Vortex Particles (LEV)
-const vortexCount = 350;
-const vortexGeo = new THREE.BufferGeometry();
-const vortexPositions = new Float32Array(vortexCount * 3);
-const vortexVelocities = [];
+// 6. SIX ARTICULATED LEGS WITH ORANGE JOINTS
+function createBeeLeg(side, index) {
+  const leg = new THREE.Group();
+  const z = 1.4 - index * 1.5;
+  leg.position.set(side * 2.4, -1.2, z);
 
-for (let i = 0; i < vortexCount; i++) {
-  vortexPositions[i * 3 + 0] = (Math.random() - 0.5) * 16;
-  vortexPositions[i * 3 + 1] = Math.random() * 4;
-  vortexPositions[i * 3 + 2] = (Math.random() - 0.5) * 10;
-  vortexVelocities.push({
-    x: (Math.random() - 0.5) * 0.1,
-    y: -0.2 - Math.random() * 0.3,
-    z: -0.15 - Math.random() * 0.2
-  });
+  // Orange Hip Ball
+  const hip = new THREE.Mesh(new THREE.SphereGeometry(0.35, 14, 14), matOrangeRing);
+  leg.add(hip);
+
+  // White Thigh Femur
+  const femurLen = 3.6;
+  const femur = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, femurLen, 12), matWhiteShell);
+  femur.position.set(side * 0.8, -femurLen / 2, 0);
+  femur.rotation.z = side * 0.45;
+  femur.castShadow = true;
+  leg.add(femur);
+
+  // Knee Joint
+  const knee = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 14), matOrangeRing);
+  knee.position.set(side * 1.6, -femurLen, 0);
+  leg.add(knee);
+
+  // Lower Tibia
+  const tibiaLen = 4.4;
+  const tibia = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.08, tibiaLen, 12), matDarkMetal);
+  tibia.position.set(side * 2.2, -femurLen - tibiaLen / 2, 0.2);
+  tibia.rotation.z = -side * 0.25;
+  tibia.castShadow = true;
+  leg.add(tibia);
+
+  // Suction Rubber Foot
+  const foot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), matDarkMetal);
+  foot.position.set(side * 2.8, -femurLen - tibiaLen, 0.4);
+  leg.add(foot);
+
+  return {group: leg, side, index};
 }
-vortexGeo.setAttribute('position', new THREE.BufferAttribute(vortexPositions, 3));
-const matVortex = new THREE.PointsMaterial({
-  color: 0x00f0ff,
-  size: 0.35,
-  transparent: true,
-  opacity: 0.65,
-  blending: THREE.AdditiveBlending
-});
-const vortexParticles = new THREE.Points(vortexGeo, matVortex);
-beeGroup.add(vortexParticles);
+
+for (let i = 0; i < 3; i++) {
+  const legL = createBeeLeg(-1, i);
+  const legR = createBeeLeg(1, i);
+  beeRoot.add(legL.group, legR.group);
+  registerExploded(legL.group, new THREE.Vector3(-3.5, -2.5, (1 - i) * 2.5), `LEG L${i+1}`, 'SERVO 3-AXIS');
+  registerExploded(legR.group, new THREE.Vector3(3.5, -2.5, (1 - i) * 2.5), `LEG R${i+1}`, 'SERVO 3-AXIS');
+}
 
 // -------------------------------------------------------------------------
-// INTERACTIVE CAMERA CONTROLS
+// 3D CALLOUT LABELS ON DOM
+// -------------------------------------------------------------------------
+const calloutDivs = [];
+explodedParts.forEach(part => {
+  if (!part.label) return;
+  const div = document.createElement('div');
+  div.className = 'callout-label';
+  div.innerHTML = `${part.label}<span>${part.detail}</span>`;
+  document.body.appendChild(div);
+  calloutDivs.push({div, part});
+});
+
+// -------------------------------------------------------------------------
+// STATE MANAGEMENT & UI INTERACTIVITY
+// -------------------------------------------------------------------------
+let isExploded = false;
+let explodeAmount = 0; // 0 = assembled, 1 = teardown
+let showLabels = false;
+let isTurntable = false;
+let isPlaying = true;
+let flightMode = 'HOVER'; // HOVER, TEARDOWN, CRUISE
+
+const btnExploded = document.getElementById('btn-exploded');
+btnExploded.addEventListener('click', () => {
+  isExploded = !isExploded;
+  btnExploded.classList.toggle('active', isExploded);
+  
+  if (isExploded) {
+    showLabels = true;
+    btnLabels.classList.add('active');
+    document.getElementById('hud-flight-mode').innerText = 'TEARDOWN';
+    document.getElementById('hud-flight-mode').style.color = '#ff4800';
+    document.getElementById('hud-flight-desc').innerText = 'TURNTABLE 104° · 100% APART';
+    document.getElementById('hud-status-text').innerText = 'TEARDOWN';
+    document.getElementById('hud-status-badge').className = 'status-badge badge-red';
+    
+    // Set all subsystems to DETACHED
+    document.querySelectorAll('.subsystem-badge').forEach(b => {
+      b.className = 'subsystem-badge badge-red';
+      b.innerText = 'DETACHED';
+    });
+  } else {
+    document.getElementById('hud-flight-mode').innerText = 'HOVER';
+    document.getElementById('hud-flight-mode').style.color = '#ff4800';
+    document.getElementById('hud-flight-desc').innerText = 'STATION KEEPING · 144 MM AGL';
+    document.getElementById('hud-status-text').innerText = 'HOVER';
+    document.getElementById('hud-status-badge').className = 'status-badge badge-green';
+
+    document.getElementById('sub-01').className = 'subsystem-badge badge-green'; document.getElementById('sub-01').innerText = 'TRACKING';
+    document.getElementById('sub-02').className = 'subsystem-badge badge-green'; document.getElementById('sub-02').innerText = 'LOCKED';
+    document.getElementById('sub-03').className = 'subsystem-badge badge-blue'; document.getElementById('sub-03').innerText = 'ENGAGED';
+    document.getElementById('sub-04').className = 'subsystem-badge badge-green'; document.getElementById('sub-04').innerText = '7.5 HZ';
+    document.getElementById('sub-05').className = 'subsystem-badge badge-green'; document.getElementById('sub-05').innerText = 'ACTIVE';
+    document.getElementById('sub-06').className = 'subsystem-badge badge-green'; document.getElementById('sub-06').innerText = 'SEALED';
+  }
+});
+
+const btnLabels = document.getElementById('btn-labels');
+btnLabels.addEventListener('click', () => {
+  showLabels = !showLabels;
+  btnLabels.classList.toggle('active', showLabels);
+});
+
+const btnTurntable = document.getElementById('btn-turntable');
+btnTurntable.addEventListener('click', () => {
+  isTurntable = !isTurntable;
+  btnTurntable.classList.toggle('active', isTurntable);
+});
+
+const btnMotion = document.getElementById('btn-motion');
+btnMotion.addEventListener('click', () => {
+  btnMotion.classList.toggle('active');
+});
+
+// Assembly Focus Buttons
+document.querySelectorAll('.tech-btn[data-assembly]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tech-btn[data-assembly]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const type = btn.dataset.assembly;
+    
+    if (type === 'hero') {
+      camTarget.set(0, 0, 0);
+      camSpherical = {radius: 36, theta: 0.8, phi: 1.1};
+    } else if (type === 'optics') {
+      camTarget.set(0, 0.4, 4.2);
+      camSpherical = {radius: 12, theta: 0.3, phi: 1.3};
+    } else if (type === 'wing') {
+      camTarget.set(-2.2, 1.8, 0.2);
+      camSpherical = {radius: 16, theta: 1.2, phi: 1.2};
+    } else if (type === 'leg') {
+      camTarget.set(-2.4, -3.0, 0);
+      camSpherical = {radius: 14, theta: 1.4, phi: 1.6};
+    } else if (type === 'thorax') {
+      camTarget.set(0, 0, 0);
+      camSpherical = {radius: 18, theta: 0.6, phi: 1.2};
+    } else if (type === 'abdomen') {
+      camTarget.set(0, -0.2, -4.0);
+      camSpherical = {radius: 18, theta: 2.8, phi: 1.3};
+    }
+    updateCam();
+  });
+});
+
+const playBtn = document.getElementById('hud-play-btn');
+playBtn.addEventListener('click', () => {
+  isPlaying = !isPlaying;
+  playBtn.innerHTML = isPlaying 
+    ? `<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`
+    : `<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>`;
+});
+
+// -------------------------------------------------------------------------
+// REAL-TIME SINE WAVE CHART (7.5 HZ WING BEAT)
+// -------------------------------------------------------------------------
+const waveCanvas = document.getElementById('wing-wave');
+const waveCtx = waveCanvas.getContext('2d');
+let wavePhase = 0;
+
+function drawWave() {
+  const w = waveCanvas.width = waveCanvas.offsetWidth;
+  const h = waveCanvas.height = waveCanvas.offsetHeight;
+  waveCtx.clearRect(0, 0, w, h);
+
+  // Center baseline
+  waveCtx.strokeStyle = '#e5e1d8';
+  waveCtx.lineWidth = 1;
+  waveCtx.beginPath();
+  waveCtx.moveTo(0, h / 2);
+  waveCtx.lineTo(w, h / 2);
+  waveCtx.stroke();
+
+  // Flapping Sine Wave
+  waveCtx.strokeStyle = '#ff4800';
+  waveCtx.lineWidth = 1.8;
+  waveCtx.beginPath();
+  
+  const points = 120;
+  for (let i = 0; i <= points; i++) {
+    const x = (i / points) * w;
+    // Amplitude dampens towards the left edge
+    const damp = (i / points);
+    const y = h / 2 + Math.sin(wavePhase - (points - i) * 0.22) * (h * 0.38) * damp;
+    if (i === 0) waveCtx.moveTo(x, y);
+    else waveCtx.lineTo(x, y);
+  }
+  waveCtx.stroke();
+
+  // Current dot
+  const dotY = h / 2 + Math.sin(wavePhase) * (h * 0.38);
+  waveCtx.fillStyle = '#ff4800';
+  waveCtx.beginPath();
+  waveCtx.arc(w - 2, dotY, 3, 0, Math.PI * 2);
+  waveCtx.fill();
+}
+
+// -------------------------------------------------------------------------
+// CAMERA ORBIT CONTROLS
 // -------------------------------------------------------------------------
 let isDragging = false;
 let prevPointer = {x: 0, y: 0};
@@ -411,8 +899,8 @@ let camSpherical = {radius: 36, theta: 0.8, phi: 1.1};
 let camTarget = new THREE.Vector3(0, 0, 0);
 
 function updateCam() {
-  camSpherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, camSpherical.phi));
-  camSpherical.radius = Math.max(10, Math.min(80, camSpherical.radius));
+  camSpherical.phi = Math.max(0.08, Math.min(Math.PI - 0.08, camSpherical.phi));
+  camSpherical.radius = Math.max(8, Math.min(90, camSpherical.radius));
   camera.position.x = camTarget.x + camSpherical.radius * Math.sin(camSpherical.phi) * Math.sin(camSpherical.theta);
   camera.position.y = camTarget.y + camSpherical.radius * Math.cos(camSpherical.phi);
   camera.position.z = camTarget.z + camSpherical.radius * Math.sin(camSpherical.phi) * Math.cos(camSpherical.theta);
@@ -423,7 +911,7 @@ updateCam();
 canvas.addEventListener('pointerdown', (e) => {
   isDragging = true;
   prevPointer = {x: e.clientX, y: e.clientY};
-  canvas.style.cursor = 'grabbing';
+  canvas.classList.add('grabbing');
 });
 
 window.addEventListener('pointermove', (e) => {
@@ -433,21 +921,19 @@ window.addEventListener('pointermove', (e) => {
   prevPointer = {x: e.clientX, y: e.clientY};
 
   if (e.buttons === 2 || e.shiftKey) {
-    // Pan
     const right = new THREE.Vector3().crossVectors(camera.up, camera.getWorldDirection(new THREE.Vector3())).normalize();
     camTarget.addScaledVector(right, dx * 0.05);
     camTarget.y += dy * 0.05;
   } else {
-    // Orbit
-    camSpherical.theta -= dx * 0.007;
-    camSpherical.phi -= dy * 0.007;
+    camSpherical.theta -= dx * 0.006;
+    camSpherical.phi -= dy * 0.006;
   }
   updateCam();
 });
 
 window.addEventListener('pointerup', () => {
   isDragging = false;
-  canvas.style.cursor = 'grab';
+  canvas.classList.remove('grabbing');
 });
 
 canvas.addEventListener('wheel', (e) => {
@@ -458,95 +944,6 @@ canvas.addEventListener('wheel', (e) => {
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// -------------------------------------------------------------------------
-// UI & EVENT HANDLERS
-// -------------------------------------------------------------------------
-let flapSpeed = 1.0;
-let strokeAmplitude = 115;
-let isPaused = false;
-let isXray = false;
-let showVortex = true;
-
-const speedSlider = document.getElementById('speed-slider');
-const speedLabel = document.getElementById('speed-label');
-speedSlider.addEventListener('input', (e) => {
-  flapSpeed = parseFloat(e.target.value);
-  speedLabel.innerText = `${flapSpeed.toFixed(1)}× (${Math.round(120 * flapSpeed)} Hz)`;
-  document.getElementById('ui-freq-val').innerText = `${Math.round(120 * flapSpeed)} Hz`;
-});
-
-const ampSlider = document.getElementById('amp-slider');
-const ampLabel = document.getElementById('amp-label');
-ampSlider.addEventListener('input', (e) => {
-  strokeAmplitude = parseInt(e.target.value);
-  ampLabel.innerText = `${strokeAmplitude}°`;
-});
-
-const btnPause = document.getElementById('btn-pause');
-btnPause.addEventListener('click', () => {
-  isPaused = !isPaused;
-  btnPause.innerText = isPaused ? 'Play [Space]' : 'Pause [Space]';
-  btnPause.style.borderColor = isPaused ? '#ffd700' : 'rgba(255,255,255,0.12)';
-});
-
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') {
-    e.preventDefault();
-    btnPause.click();
-  }
-});
-
-const btnXray = document.getElementById('btn-xray');
-btnXray.addEventListener('click', () => {
-  isXray = !isXray;
-  matCarbon.transparent = isXray;
-  matCarbon.opacity = isXray ? 0.35 : 1.0;
-  matCarbon.wireframe = isXray;
-  btnXray.style.background = isXray ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.06)';
-  btnXray.style.borderColor = isXray ? '#00f0ff' : 'rgba(255,255,255,0.12)';
-});
-
-const btnVortex = document.getElementById('btn-vortex');
-btnVortex.addEventListener('click', () => {
-  showVortex = !showVortex;
-  vortexParticles.visible = showVortex;
-  btnVortex.style.opacity = showVortex ? '1' : '0.4';
-});
-
-const btnReset = document.getElementById('btn-reset');
-btnReset.addEventListener('click', () => {
-  camSpherical = {radius: 36, theta: 0.8, phi: 1.1};
-  camTarget.set(0, 0, 0);
-  updateCam();
-});
-
-document.querySelectorAll('.cam-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.cam-btn').forEach(b => {
-      b.style.background = 'rgba(255,255,255,0.06)';
-      b.style.color = '#e2e8f0';
-    });
-    btn.style.background = 'rgba(255,215,0,0.15)';
-    btn.style.color = '#ffd700';
-
-    const camType = btn.dataset.cam;
-    if (camType === 'orbit') {
-      camSpherical = {radius: 36, theta: 0.8, phi: 1.1};
-      camTarget.set(0, 0, 0);
-    } else if (camType === 'top') {
-      camSpherical = {radius: 32, theta: 0.0, phi: 0.05};
-      camTarget.set(0, 0, 0);
-    } else if (camType === 'front') {
-      camSpherical = {radius: 28, theta: 0.0, phi: Math.PI / 2};
-      camTarget.set(0, 0, 0);
-    } else if (camType === 'wing') {
-      camSpherical = {radius: 14, theta: 1.2, phi: 1.3};
-      camTarget.set(-2, 1.5, 0);
-    }
-    updateCam();
-  });
-});
-
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -554,10 +951,11 @@ window.addEventListener('resize', () => {
 });
 
 // -------------------------------------------------------------------------
-// ANIMATION & KINEMATICS LOOP
+// MAIN ANIMATION LOOP
 // -------------------------------------------------------------------------
 let clock = 0;
 let lastTime = performance.now();
+const tempVec = new THREE.Vector3();
 
 function animate(now) {
   requestAnimationFrame(animate);
@@ -565,72 +963,76 @@ function animate(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
 
-  if (!isPaused) {
-    clock += dt * flapSpeed * 30.0; // Scaled for visible 60fps rendering
+  if (isPlaying) {
+    clock += dt;
+    wavePhase += dt * 7.5 * Math.PI * 2; // 7.5 Hz
   }
 
-  // Kinematic Flapping Equations
-  const radAmp = (strokeAmplitude * Math.PI) / 180;
-  const strokePhase = clock;
-  
-  // Stroke angle (horizontal sweep): phi(t) = phi_max * cos(wt)
-  const strokeAngle = Math.cos(strokePhase) * radAmp * 0.5;
-  // Pitch / feathering angle: psi(t) = psi_max * sin(wt)
-  const pitchAngle = Math.sin(strokePhase) * 0.65;
-  // Deviation (figure-8 path): theta(t) = theta_max * sin(2wt)
-  const devAngle = Math.sin(strokePhase * 2.0) * 0.22;
-
-  // Apply to Left Wing
-  wingHingeL.rotation.y = strokeAngle;
-  wingHingeL.rotation.x = pitchAngle;
-  wingHingeL.rotation.z = devAngle;
-
-  // Apply to Right Wing (symmetric reflection)
-  wingHingeR.rotation.y = -strokeAngle;
-  wingHingeR.rotation.x = pitchAngle;
-  wingHingeR.rotation.z = -devAngle;
-
-  // Body Hovering Dynamics & Abdomen Breathing
-  beeGroup.position.y = Math.sin(clock * 0.4) * 0.6;
-  beeGroup.rotation.x = Math.sin(clock * 0.2) * 0.05 + 0.1;
-
-  // Abdomen contraction
-  const breath = Math.sin(clock * 0.15) * 0.12;
-  abdomenGroup.rotation.x = -0.2 + breath;
-  for (let i = 0; i < segMeshes.length; i++) {
-    const s = 1.0 + Math.sin(clock * 0.25 + i * 0.4) * 0.04;
-    segMeshes[i].scale.set(s, s, 1.0);
+  // Turntable slow rotation
+  if (isTurntable) {
+    camSpherical.theta += dt * 0.25;
+    updateCam();
   }
 
-  // Antennae vibration
-  antL.rotation.z = -0.2 + Math.sin(clock * 0.8) * 0.08;
-  antR.rotation.z = 0.2 - Math.sin(clock * 0.8) * 0.08;
+  // Smooth Explode Animation Interpolation
+  const targetExplode = isExploded ? 1.0 : 0.0;
+  explodeAmount += (targetExplode - explodeAmount) * Math.min(1.0, dt * 6.0);
 
-  // Airflow Vortex Particles Circulation
-  if (showVortex) {
-    const pos = vortexGeo.attributes.position.array;
-    for (let i = 0; i < vortexCount; i++) {
-      const idx = i * 3;
-      pos[idx + 0] += vortexVelocities[i].x;
-      pos[idx + 1] += vortexVelocities[i].y * flapSpeed;
-      pos[idx + 2] += vortexVelocities[i].z;
+  // Position parts based on explode amount
+  for (let i = 0; i < explodedParts.length; i++) {
+    const p = explodedParts[i];
+    p.mesh.position.copy(p.basePos).addScaledVector(p.explodeVec, explodeAmount);
+  }
 
-      // Recycle particles behind wings
-      if (pos[idx + 1] < -10) {
-        pos[idx + 0] = (Math.random() - 0.5) * 14;
-        pos[idx + 1] = 2.0 + Math.random() * 2.0;
-        pos[idx + 2] = -1.0 + (Math.random() - 0.5) * 4.0;
+  // Wing Flapping Dynamics (When not exploded)
+  if (!isExploded) {
+    const flapAngle = Math.sin(wavePhase) * (32 * Math.PI / 180);
+    const pitchAngle = Math.cos(wavePhase) * 0.25;
+    wingLRoot.rotation.set(pitchAngle, flapAngle, 0);
+    wingRRoot.rotation.set(pitchAngle, -flapAngle, 0);
+
+    // Body Hovering Micromotion
+    beeRoot.position.y = Math.sin(clock * 3.0) * 0.15;
+  } else {
+    wingLRoot.rotation.set(0, 0, 0);
+    wingRRoot.rotation.set(0, 0, 0);
+  }
+
+  // Update Callout Labels Projection in 2D Screen Space
+  for (let i = 0; i < calloutDivs.length; i++) {
+    const {div, part} = calloutDivs[i];
+    if (showLabels && explodeAmount > 0.1) {
+      part.mesh.getWorldPosition(tempVec);
+      tempVec.project(camera);
+      // Only show if in front of camera
+      if (tempVec.z < 1.0) {
+        const sx = (tempVec.x * 0.5 + 0.5) * innerWidth;
+        const sy = (-(tempVec.y * 0.5) + 0.5) * innerHeight;
+        div.style.left = `${sx}px`;
+        div.style.top = `${sy}px`;
+        div.style.display = 'block';
+        div.style.opacity = `${explodeAmount}`;
+      } else {
+        div.style.display = 'none';
       }
+    } else {
+      div.style.display = 'none';
     }
-    vortexGeo.attributes.position.needsUpdate = true;
   }
 
-  // Update Dynamic HUD Readouts
-  const instantLift = Math.abs(Math.sin(strokePhase)) * 180 * flapSpeed;
-  const instantAoa = Math.sin(strokePhase) * 42.0;
-  document.getElementById('stat-lift').innerText = `${instantLift.toFixed(1)} mN`;
-  document.getElementById('stat-aoa').innerText = `${instantAoa > 0 ? '+' : ''}${instantAoa.toFixed(1)}°`;
-  document.getElementById('stat-power').innerText = `${Math.round(260 + instantLift * 1.2)} mW`;
+  // Draw Wave
+  drawWave();
+
+  // Dynamic Telemetry updates
+  const seconds = Math.floor(clock);
+  const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const ss = String(seconds % 60).padStart(2, '0');
+  document.getElementById('hud-runtime').innerText = `00:${mm}:${ss}`;
+  document.getElementById('time-current').innerText = `${mm}:${ss}`;
+
+  // Update Gimbal horizon
+  const horizonRoll = Math.sin(clock * 1.5) * 4.0;
+  document.getElementById('horizon-line').style.transform = `rotate(${horizonRoll}deg)`;
 
   renderer.render(scene, camera);
 }

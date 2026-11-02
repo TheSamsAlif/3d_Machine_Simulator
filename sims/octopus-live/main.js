@@ -1,545 +1,1428 @@
 import * as THREE from 'three';
 
-// Soft-Robotics Octopus (Biomimetic Cephalopod Hydro-Jet & Continuum Arm Simulator)
-// Features: 8 articulated continuum hydrostatic tentacles, pulsed siphon jet propulsion,
-// bioluminescent chromatophore mantle, suction pad grid, hydrodynamic wake cavitation.
+// =========================================================================
+// PELAGOS OC-8 · ROBOTIC CEPHALOPOD EIGHT-ARM SUBSEA DRONE
+// SOFT-ARM MANIPULATOR / FIELD SIMULATOR
+// Exact match to user lab console screenshots & high-fidelity 3D teardown
+// =========================================================================
 
 const app = document.getElementById('app');
+
+// Inject CSS matching the screenshots
+const style = document.createElement('style');
+style.textContent = `
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+  
+  :root {
+    --bg-lab: #f6f4f0;
+    --text-dark: #1a1917;
+    --text-muted: #8c8983;
+    --text-faint: #b8b5ae;
+    --border-line: #e3dfd7;
+    --border-dark: #2a2825;
+    --accent-orange: #ff4800;
+    --accent-orange-bg: #fff0eb;
+    --accent-green: #0ea569;
+    --accent-green-bg: #e6f7ef;
+    --panel-bg: rgba(255, 255, 255, 0.94);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-lab); font-family: 'Inter', sans-serif; color: var(--text-dark); user-select: none; }
+  
+  #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #gl { width: 100%; height: 100%; display: block; cursor: grab; }
+  #gl.grabbing { cursor: grabbing; }
+
+  /* UI Layer */
+  #hud-layer { position: absolute; inset: 0; pointer-events: none; z-index: 20; padding: 18px 24px; display: flex; flex-direction: column; justify-content: space-between; }
+  .interactive { pointer-events: auto; }
+
+  /* Top Bar */
+  .top-bar { display: flex; justify-content: space-between; align-items: flex-start; }
+  .brand-group { display: flex; align-items: stretch; gap: 14px; }
+  .logo-box { background: var(--accent-orange); color: #fff; border-radius: 4px; padding: 6px 12px; display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
+  .logo-box svg { width: 20px; height: 20px; fill: currentColor; }
+  .title-block { display: flex; flex-direction: column; justify-content: center; }
+  .title-tag { font-size: 8.5px; font-weight: 600; letter-spacing: 1.5px; color: var(--text-muted); text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+  .title-main { font-size: 22px; font-weight: 800; letter-spacing: -0.3px; color: var(--text-dark); line-height: 1.1; margin-top: 1px; }
+  .title-main span { color: var(--accent-orange); font-weight: 400; margin-left: 2px; }
+  .title-sub { font-size: 9px; font-weight: 600; letter-spacing: 1.2px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+
+  /* Top Center Specs */
+  .top-center { display: flex; align-items: center; gap: 28px; background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 7px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.03); }
+  .spec-item { display: flex; flex-direction: column; gap: 2px; font-family: 'JetBrains Mono', monospace; }
+  .spec-label { font-size: 8px; font-weight: 600; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+  .spec-val { font-size: 11px; font-weight: 700; color: var(--text-dark); }
+  .lift-load-bar { width: 140px; height: 7px; background: #e8e5de; border-radius: 2px; overflow: hidden; display: flex; gap: 2px; }
+  .lift-seg { flex: 1; height: 100%; background: #d0ccc3; }
+  .lift-seg.fill { background: var(--text-dark); }
+  .status-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: var(--accent-green); background: var(--accent-green-bg); padding: 2px 8px; border-radius: 3px; }
+  .status-badge.orange { color: var(--accent-orange); background: var(--accent-orange-bg); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* Panels Layout */
+  .panels-wrapper { position: absolute; inset: 0; pointer-events: none; }
+  .panel-col-left { position: absolute; left: 24px; top: 96px; width: 220px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
+  .panel-col-right { position: absolute; right: 24px; top: 96px; width: 220px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
+
+  .tech-card { background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 12px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .card-title { font-size: 9px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-dark); display: flex; align-items: center; gap: 6px; }
+  .card-title::before { content: ''; display: inline-block; width: 3px; height: 10px; background: var(--accent-orange); }
+  .card-idx { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600; color: var(--text-faint); }
+
+  /* Big Metric Numbers */
+  .metric-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .metric-big { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 800; letter-spacing: -1px; color: var(--text-dark); line-height: 1; }
+  .metric-unit { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+  .metric-sub { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-dark); }
+
+  /* Jet Pressure Wave Canvas */
+  .wave-canvas { width: 100%; height: 42px; border-bottom: 1px solid var(--border-line); margin-bottom: 6px; display: block; }
+  .wave-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--text-muted); }
+
+  /* Battery Gauge */
+  .power-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-line); font-family: 'JetBrains Mono', monospace; }
+  .power-sub { font-size: 7.5px; color: var(--text-muted); text-transform: uppercase; }
+  .power-val { font-size: 10px; font-weight: 700; color: var(--text-dark); }
+  .battery-bars { display: flex; gap: 2px; height: 12px; margin-top: 4px; }
+  .battery-seg { flex: 1; border-radius: 1px; background: #e5e2da; }
+  .battery-seg.fill-red { background: var(--accent-orange); }
+  .battery-seg.fill-green { background: var(--accent-green); }
+
+  /* Arm Curl Rows */
+  .servo-row { display: flex; align-items: center; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 9px; margin-bottom: 4px; }
+  .servo-name { width: 22px; font-weight: 700; color: var(--text-dark); }
+  .servo-track { flex: 1; height: 4px; background: #e8e4dc; border-radius: 2px; margin: 0 8px; overflow: hidden; }
+  .servo-fill { height: 100%; background: var(--accent-orange); transition: width 0.3s ease; }
+  .servo-val { width: 44px; text-align: right; font-weight: 600; color: var(--text-dark); }
+  .servo-val.detached { color: var(--accent-orange); font-size: 7.5px; font-weight: 700; }
+
+  /* Right Side Buttons Grid */
+  .btn-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 4px; }
+  .btn-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin-top: 4px; }
+  .pill-btn {
+    border: 1px solid var(--border-line);
+    background: #fff;
+    color: var(--text-dark);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px;
+    font-weight: 700;
+    padding: 6px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+    text-transform: uppercase;
+  }
+  .pill-btn:hover { border-color: var(--text-dark); }
+  .pill-btn.active {
+    background: var(--accent-orange);
+    color: #fff;
+    border-color: var(--accent-orange);
+  }
+
+  /* Attitude / Depth Horizon */
+  .gimbal-box { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .gimbal-circle { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border-line); background: #eeebe3; position: relative; overflow: hidden; }
+  .gimbal-horizon { position: absolute; left: -10px; right: -10px; top: 50%; height: 1.5px; background: var(--accent-orange); transform-origin: center; }
+  .gimbal-sub { flex: 1; display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace; }
+  .gimbal-row { display: flex; justify-content: space-between; font-size: 8.5px; }
+  .gimbal-lbl { color: var(--text-muted); }
+  .gimbal-val { font-weight: 700; color: var(--text-dark); }
+
+  /* Subsystems List */
+  .subsys-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dotted var(--border-line); font-family: 'JetBrains Mono', monospace; font-size: 8px; }
+  .subsys-item:last-child { border-bottom: none; }
+  .subsys-left { display: flex; flex-direction: column; }
+  .subsys-name { font-weight: 700; color: var(--text-dark); text-transform: uppercase; }
+  .subsys-desc { color: var(--text-muted); font-size: 7px; }
+  .subsys-tag { font-size: 7.5px; font-weight: 700; padding: 2px 5px; border-radius: 2px; }
+  .subsys-tag.green { background: var(--accent-green-bg); color: var(--accent-green); }
+  .subsys-tag.orange { background: var(--accent-orange-bg); color: var(--accent-orange); }
+
+  /* Operating Mode Center Title */
+  .flight-mode-anchor { position: absolute; left: 24px; bottom: 84px; pointer-events: none; }
+  .flight-mode-tag { font-size: 8.5px; font-weight: 700; letter-spacing: 1.4px; color: var(--text-muted); text-transform: uppercase; font-family: 'JetBrains Mono', monospace; }
+  .flight-mode-title { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; color: var(--accent-orange); line-height: 1; margin: 3px 0; }
+  .flight-mode-sub { font-size: 9px; font-weight: 600; letter-spacing: 1.2px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; }
+
+  /* Bottom Timeline / Log Bar */
+  .bottom-bar { display: flex; align-items: center; gap: 16px; background: var(--panel-bg); border: 1px solid var(--border-line); border-radius: 6px; padding: 8px 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); pointer-events: auto; }
+  .play-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-orange); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.1s; }
+  .play-btn:active { transform: scale(0.95); }
+  .play-btn svg { width: 14px; height: 14px; fill: currentColor; }
+  .timeline-track { flex: 1; height: 3px; background: #e3dfd7; border-radius: 2px; position: relative; display: flex; align-items: center; cursor: pointer; }
+  .timeline-progress { height: 100%; background: var(--accent-orange); border-radius: 2px; width: 34%; }
+  .timeline-thumb { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--accent-orange); position: absolute; left: 34%; transform: translateX(-50%); }
+  .timeline-meta { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 8.5px; color: var(--text-muted); }
+
+  /* 3D Screen Space Callout Labels Canvas */
+  #labels-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 15; width: 100%; height: 100%; }
+  .dom-label {
+    position: absolute;
+    transform: translate(0, -50%);
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid var(--border-line);
+    border-left: 3px solid var(--accent-orange);
+    padding: 3px 8px;
+    border-radius: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text-dark);
+    white-space: nowrap;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .dom-label .sub {
+    font-size: 6.5px;
+    color: var(--text-muted);
+    font-weight: 500;
+    display: block;
+    margin-top: 1px;
+  }
+
+  /* Watermark Grid Background in Canvas */
+  .grid-bg-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: 
+      radial-gradient(circle at 50% 50%, rgba(0,0,0,0.015) 0%, transparent 70%),
+      linear-gradient(to right, rgba(0,0,0,0.02) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0,0,0,0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 40px 40px, 40px 40px;
+  }
+`;
+document.head.appendChild(style);
+
+// Build HUD HTML Structure
 app.innerHTML = `
-  <div id="ui-container" style="position:absolute;inset:0;pointer-events:none;z-index:10;font-family:'JetBrains Mono',monospace;color:#f1f5f9;">
-    <!-- Top Header Bar -->
-    <div style="position:absolute;top:16px;left:20px;right:20px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="background:rgba(8,12,22,0.85);backdrop-filter:blur(10px);border:1px solid rgba(0,240,255,0.3);border-radius:10px;padding:8px 18px;display:flex;align-items:center;gap:12px;">
-        <span style="font-size:1.4rem;">🐙</span>
-        <div>
-          <div style="font-weight:700;font-size:1.05rem;letter-spacing:1px;color:#00f0ff;">OCTO-BOT · HYDRO-8</div>
-          <div style="font-size:0.7rem;color:#94a3b8;letter-spacing:0.5px;">SOFT-ROBOTIC CONTINUUM MANIPULATOR & HYDRO-JET</div>
+  <div id="canvas-container">
+    <canvas id="gl"></canvas>
+    <div class="grid-bg-overlay"></div>
+    <canvas id="labels-canvas"></canvas>
+  </div>
+
+  <div id="hud-layer">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="brand-group interactive">
+        <div class="logo-box">
+          <svg viewBox="0 0 24 24"><path d="M12 2a6 6 0 0 0-6 6c0 2.22 1.21 4.16 3 5.2V15c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1.8c1.79-1.04 3-2.98 3-5.2a6 6 0 0 0-6-6zm-3.5 14.5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm7 0c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5zm-3.5 2c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5 1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/></svg>
+          <span>OC-8</span>
+        </div>
+        <div class="title-block">
+          <div class="title-tag">ROBOTIC CEPHALOPOD · EIGHT-ARM SUBSEA DRONE</div>
+          <div class="title-main">Pelagos OC-8<span>/</span></div>
+          <div class="title-sub">SOFT-ARM MANIPULATOR / FIELD SIMULATOR</div>
         </div>
       </div>
 
-      <!-- Quick Stats Pill -->
-      <div style="background:rgba(8,12,22,0.85);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:8px 16px;display:flex;gap:20px;">
-        <div><span style="color:#94a3b8;font-size:0.65rem;">HYDRO-THRUST:</span> <b id="ui-thrust-val" style="color:#00f0ff;">48.2 N</b></div>
-        <div><span style="color:#94a3b8;font-size:0.65rem;">SIPHON JET:</span> <b id="ui-siphon-val" style="color:#10b981;">PULSING</b></div>
-        <div><span style="color:#94a3b8;font-size:0.65rem;">ARMS:</span> <b style="color:#ffd700;">8 CONTINUUM</b></div>
-      </div>
-    </div>
-
-    <!-- Left Controls Panel -->
-    <div style="position:absolute;left:20px;top:90px;width:290px;background:rgba(8,12,22,0.85);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px;pointer-events:auto;">
-      <div style="font-size:0.75rem;font-weight:700;color:#00f0ff;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:6px;">
-        PNEUMATIC / FLUID ENGINE
-      </div>
-
-      <!-- Propulsion Pulse Frequency -->
-      <div>
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:6px;">
-          <span>HYDRO-JET PULSE:</span>
-          <span id="speed-label" style="color:#00f0ff;font-weight:700;">1.0× (1.2 Hz)</span>
+      <!-- Top Center Telemetry Pill -->
+      <div class="top-center interactive">
+        <div class="spec-item">
+          <span class="spec-label">JET LOAD</span>
+          <div class="lift-load-bar" id="load-bar">
+            <!-- 20 segments -->
+          </div>
         </div>
-        <input type="range" id="speed-slider" min="0.2" max="2.5" step="0.1" value="1.0" style="width:100%;accent-color:#00f0ff;cursor:pointer;">
-      </div>
-
-      <!-- Tentacle Wave Amplitude -->
-      <div>
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:6px;">
-          <span>ARM WAVE CURL:</span>
-          <span id="amp-label" style="color:#10b981;font-weight:700;">100%</span>
+        <div class="spec-item">
+          <span class="spec-label">SIM ID</span>
+          <span class="spec-val">OC8-0731</span>
         </div>
-        <input type="range" id="amp-slider" min="20" max="180" step="5" value="100" style="width:100%;accent-color:#10b981;cursor:pointer;">
-      </div>
-
-      <!-- Kinematic Gait Modes -->
-      <div>
-        <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:8px;text-transform:uppercase;">Locomotion Gait Mode:</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          <button class="gait-btn active" data-gait="swim" style="background:rgba(0,240,255,0.18);border:1px solid #00f0ff;color:#00f0ff;padding:6px;font-family:inherit;font-size:0.7rem;border-radius:6px;cursor:pointer;">Jet Swim</button>
-          <button class="gait-btn" data-gait="crawl" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;padding:6px;font-family:inherit;font-size:0.7rem;border-radius:6px;cursor:pointer;">Floor Crawl</button>
-          <button id="btn-glow" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;padding:6px;font-family:inherit;font-size:0.7rem;border-radius:6px;cursor:pointer;">Biolum Grid</button>
-          <button id="btn-pause" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;padding:6px;font-family:inherit;font-size:0.7rem;border-radius:6px;cursor:pointer;">Pause [Space]</button>
+        <div class="spec-item">
+          <span class="spec-label">RUNTIME</span>
+          <span class="spec-val" id="val-runtime">00:08:06</span>
         </div>
-      </div>
-
-      <!-- Camera Presets -->
-      <div>
-        <div style="font-size:0.7rem;color:#94a3b8;margin-bottom:6px;text-transform:uppercase;">Camera Presets:</div>
-        <div style="display:flex;gap:4px;">
-          <button class="cam-btn" data-cam="orbit" style="flex:1;background:rgba(0,240,255,0.15);border:1px solid rgba(0,240,255,0.3);color:#00f0ff;padding:5px;font-size:0.65rem;border-radius:4px;cursor:pointer;">Orbit</button>
-          <button class="cam-btn" data-cam="top" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;padding:5px;font-size:0.65rem;border-radius:4px;cursor:pointer;">Top Plan</button>
-          <button class="cam-btn" data-cam="siphon" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;padding:5px;font-size:0.65rem;border-radius:4px;cursor:pointer;">Siphon</button>
-          <button class="cam-btn" data-cam="tentacle" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;padding:5px;font-size:0.65rem;border-radius:4px;cursor:pointer;">Arm Macro</button>
+        <div class="spec-item">
+          <span class="spec-label">STATUS</span>
+          <span class="status-badge" id="val-status">
+            <span class="status-dot"></span>
+            <span id="val-status-text">HOLDING</span>
+          </span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-label">OPERATOR</span>
+          <span class="spec-val">TANK 2 · M.S.</span>
         </div>
       </div>
     </div>
 
-    <!-- Bottom Right Telemetry Box -->
-    <div style="position:absolute;right:20px;bottom:20px;width:320px;background:rgba(8,12,22,0.85);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;">
-      <div style="font-size:0.75rem;font-weight:700;color:#00f0ff;letter-spacing:1px;display:flex;justify-content:space-between;">
-        <span>CONTINUUM TELEMETRY</span>
-        <span style="color:#10b981;">ACTIVE</span>
+    <!-- Operating Mode Floating Tag (Center Left) -->
+    <div class="flight-mode-anchor">
+      <div class="flight-mode-tag">OPERATING MODE</div>
+      <div class="flight-mode-title" id="mode-title">HOLDING</div>
+      <div class="flight-mode-sub" id="mode-desc">STATION KEEPING · 12.42 M DEPTH</div>
+    </div>
+
+    <!-- Panels Wrapper -->
+    <div class="panels-wrapper">
+      <!-- Left Column -->
+      <div class="panel-col-left">
+        <!-- 01 JET -->
+        <div class="tech-card">
+          <div class="card-header">
+            <span class="card-title">JET</span>
+            <span class="card-idx">01</span>
+          </div>
+          <div class="metric-row">
+            <div>
+              <span class="metric-big" id="val-kpa">17</span><span class="metric-unit">KPA</span>
+              <div style="font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono'; text-transform:uppercase;">MANTLE PRESSURE</div>
+            </div>
+            <div style="text-align:right;">
+              <span class="metric-big" id="val-thrust">6</span><span class="metric-unit">N</span>
+              <div style="font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono'; text-transform:uppercase;">THRUST</div>
+            </div>
+          </div>
+          <canvas class="wave-canvas" id="jet-canvas" width="200" height="42"></canvas>
+          <div class="wave-meta">
+            <span>PULSE <b id="val-pulse">0.0 HZ</b></span>
+            <span>SIPHON IDLE</span>
+          </div>
+        </div>
+
+        <!-- 02 POWER -->
+        <div class="tech-card">
+          <div class="card-header">
+            <span class="card-title">POWER</span>
+            <span class="card-idx">02</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span class="metric-big">86</span><span class="metric-unit">%</span>
+              <div style="font-size:7px; color:var(--text-muted); font-family:'JetBrains Mono';">BATTERY</div>
+            </div>
+            <div class="battery-bars" style="width: 100px;">
+              <div class="battery-seg fill-red"></div>
+              <div class="battery-seg fill-red"></div>
+              <div class="battery-seg fill-green"></div>
+              <div class="battery-seg fill-green"></div>
+              <div class="battery-seg fill-green"></div>
+              <div class="battery-seg fill-green"></div>
+              <div class="battery-seg fill-green"></div>
+              <div class="battery-seg fill-green"></div>
+              <div class="battery-seg fill-green"></div>
+              <div class="battery-seg"></div>
+            </div>
+          </div>
+          <div class="power-stats">
+            <div>
+              <div class="power-sub">DRAW</div>
+              <div class="power-val" id="val-draw">16.1 W</div>
+            </div>
+            <div>
+              <div class="power-sub">CELL</div>
+              <div class="power-val">3.72 V</div>
+            </div>
+            <div>
+              <div class="power-sub">MOTOR</div>
+              <div class="power-val">25 °C</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 03 ARM CURL -->
+        <div class="tech-card">
+          <div class="card-header">
+            <span class="card-title">ARM CURL</span>
+            <span class="card-idx">03</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:7.5px; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:6px;">
+            <span>CURL PER ARM · TIP SPIRAL</span>
+            <span class="subsys-tag green" id="arm-mode-tag">CURLING</span>
+          </div>
+          <div id="arm-rows">
+            <!-- R1..R4, L1..L4 rows injected dynamically -->
+          </div>
+        </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.75rem;">
-        <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-          <div style="color:#94a3b8;font-size:0.65rem;">SIPHON PRESSURE:</div>
-          <div id="stat-pres" style="font-size:0.95rem;font-weight:700;color:#00f0ff;">185.0 kPa</div>
+
+      <!-- Right Column -->
+      <div class="panel-col-right">
+        <!-- 04 DEPTH & ATTITUDE -->
+        <div class="tech-card">
+          <div class="card-header">
+            <span class="card-title">DEPTH</span>
+            <span class="card-idx">04</span>
+          </div>
+          <div class="gimbal-box">
+            <div class="gimbal-circle">
+              <div class="gimbal-horizon" id="gimbal-line"></div>
+            </div>
+            <div class="gimbal-sub">
+              <div class="gimbal-row">
+                <span class="gimbal-lbl">DEPTH</span>
+                <span class="gimbal-val" id="val-depth">12.42 M</span>
+              </div>
+              <div class="gimbal-row">
+                <span class="gimbal-lbl">V/S</span>
+                <span class="gimbal-val">-0.04 M/S</span>
+              </div>
+              <div class="gimbal-row">
+                <span class="gimbal-lbl">PITCH</span>
+                <span class="gimbal-val" id="val-pitch">+2.05°</span>
+              </div>
+              <div class="gimbal-row">
+                <span class="gimbal-lbl">ROLL</span>
+                <span class="gimbal-val" id="val-roll">-1.82°</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:8px; font-family:'JetBrains Mono'; color:var(--text-muted); border-top:1px solid var(--border-line); padding-top:4px;">
+            <span>HOLD</span>
+            <span>STATION</span>
+            <span>SPEED <b style="color:var(--text-dark);">0.05 M/S</b></span>
+          </div>
         </div>
-        <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-          <div style="color:#94a3b8;font-size:0.65rem;">MANTLE VOLUME:</div>
-          <div id="stat-vol" style="font-size:0.95rem;font-weight:700;color:#ffd700;">4.85 L</div>
+
+        <!-- 05 ASSEMBLIES -->
+        <div class="tech-card">
+          <div class="card-header">
+            <span class="card-title">ASSEMBLIES</span>
+            <span class="card-idx">05</span>
+          </div>
+          <div class="btn-grid-3">
+            <button class="pill-btn active" data-assembly="hero">HERO</button>
+            <button class="pill-btn" data-assembly="optics">OPTICS</button>
+            <button class="pill-btn" data-assembly="mantle">MANTLE</button>
+            <button class="pill-btn" data-assembly="arm-r2">ARM R2</button>
+            <button class="pill-btn" data-assembly="siphon">SIPHON</button>
+            <button class="pill-btn" data-assembly="beak">BEAK</button>
+          </div>
         </div>
-        <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-          <div style="color:#94a3b8;font-size:0.65rem;">BENDING CURVATURE:</div>
-          <div id="stat-curve" style="font-size:0.95rem;font-weight:700;color:#10b981;">1.42 rad/m</div>
+
+        <!-- 06 DISPLAY -->
+        <div class="tech-card">
+          <div class="card-header">
+            <span class="card-title">DISPLAY</span>
+            <span class="card-idx">06</span>
+          </div>
+          <div class="btn-grid-3">
+            <button class="pill-btn active" id="btn-labels">LABELS</button>
+            <button class="pill-btn" id="btn-exploded">EXPLODED</button>
+            <button class="pill-btn" id="btn-jetwake">JET WAKE</button>
+          </div>
+          <div style="margin-top:4px;">
+            <button class="pill-btn" id="btn-turntable" style="width:100%;">TURNTABLE</button>
+          </div>
         </div>
-        <div style="background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);">
-          <div style="color:#94a3b8;font-size:0.65rem;">WATER DRAG:</div>
-          <div id="stat-drag" style="font-size:0.95rem;font-weight:700;color:#e2e8f0;">12.4 N</div>
+
+        <!-- 07 SUBSYSTEMS -->
+        <div class="tech-card">
+          <div class="card-header">
+            <span class="card-title">SUBSYSTEMS</span>
+            <span class="card-idx">07</span>
+          </div>
+          <div class="subsys-item">
+            <div class="subsys-left">
+              <span class="subsys-name">01 OPTIC ARRAY</span>
+              <span class="subsys-desc">2 x 52 MM LENS · IR RIM</span>
+            </div>
+            <span class="subsys-tag green">TRACKING</span>
+          </div>
+          <div class="subsys-item">
+            <div class="subsys-left">
+              <span class="subsys-name">02 MANTLE SHELL</span>
+              <span class="subsys-desc">6 PETALS · GLASS PORT</span>
+            </div>
+            <span class="subsys-tag green" id="sub-mantle-tag">SEALED</span>
+          </div>
+          <div class="subsys-item">
+            <div class="subsys-left">
+              <span class="subsys-name">03 PUMP CORE</span>
+              <span class="subsys-desc">REACTOR RING · 7 PISTONS</span>
+            </div>
+            <span class="subsys-tag green" id="sub-pump-tag">RUNNING</span>
+          </div>
+          <div class="subsys-item">
+            <div class="subsys-left">
+              <span class="subsys-name">04 ARM CHAINS</span>
+              <span class="subsys-desc">282 LINKS · 489 WHEELS</span>
+            </div>
+            <span class="subsys-tag green" id="sub-arm-tag">8/8 LOCKED</span>
+          </div>
+          <div class="subsys-item">
+            <div class="subsys-left">
+              <span class="subsys-name">05 SIPHON</span>
+              <span class="subsys-desc">2 SLEEVES · 4-FLAP NOZZLE</span>
+            </div>
+            <span class="subsys-tag green">IDLE</span>
+          </div>
+          <div class="subsys-item">
+            <div class="subsys-left">
+              <span class="subsys-name">06 BEAK</span>
+              <span class="subsys-desc">IRON JAW · RADULA BORE</span>
+            </div>
+            <span class="subsys-tag green">SEALED</span>
+          </div>
         </div>
       </div>
-      <div style="font-size:0.65rem;color:#64748b;line-height:1.4;">
-        *Left Click + Drag: Orbit | Right Click / Two-Finger: Pan | Scroll: Zoom
+    </div>
+
+    <!-- Bottom Bar: Operation Log Timeline -->
+    <div class="bottom-bar">
+      <button class="play-btn" id="btn-play">
+        <svg viewBox="0 0 24 24" id="play-icon"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      </button>
+      <div style="flex:1;">
+        <div style="display:flex; justify-content:space-between; font-size:7.5px; font-weight:700; color:var(--text-muted); font-family:'JetBrains Mono'; margin-bottom:4px; text-transform:uppercase;">
+          <span style="color:var(--text-dark); display:flex; align-items:center; gap:4px;"><span style="color:var(--accent-orange);">|</span> OPERATION LOG</span>
+          <span>DIVE</span>
+          <span style="color:var(--accent-orange); font-weight:700;" id="timeline-operator-text">OPERATOR · HERO · RELEASE</span>
+          <span>SURFACE</span>
+          <span class="card-idx">08</span>
+        </div>
+        <div class="timeline-track" id="timeline-track">
+          <div class="timeline-progress" id="timeline-progress"></div>
+          <div class="timeline-thumb" id="timeline-thumb"></div>
+        </div>
+        <div class="timeline-meta" style="margin-top:4px;">
+          <span id="timeline-time">00:08 / 00:25</span>
+          <span>8 OPERATOR ACTIONS</span>
+        </div>
       </div>
     </div>
   </div>
 `;
 
-// Three.js Scene Setup
-const canvas = document.createElement('canvas');
-canvas.id = 'gl';
-canvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;touch-action:none;cursor:grab;';
-app.appendChild(canvas);
+// Populate top load bar
+const loadBar = document.getElementById('load-bar');
+for (let i = 0; i < 20; i++) {
+  const seg = document.createElement('div');
+  seg.className = `lift-seg ${i < 11 ? 'fill' : ''}`;
+  loadBar.appendChild(seg);
+}
 
-const renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
-renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
-renderer.shadowMap.enabled = true;
+// Populate Arm curl rows (R1..R4, L1..L4)
+const armRowsContainer = document.getElementById('arm-rows');
+const armData = [
+  { id: 'R1', val: 91 },
+  { id: 'R2', val: 75 },
+  { id: 'R3', val: 89 },
+  { id: 'R4', val: 80 },
+  { id: 'L1', val: 67 },
+  { id: 'L2', val: 85 },
+  { id: 'L3', val: 80 },
+  { id: 'L4', val: 79 }
+];
+
+armData.forEach(item => {
+  const row = document.createElement('div');
+  row.className = 'servo-row';
+  row.id = `servo-row-${item.id}`;
+  row.innerHTML = `
+    <span class="servo-name">${item.id}</span>
+    <div class="servo-track">
+      <div class="servo-fill" id="servo-fill-${item.id}" style="width: ${item.val}%;"></div>
+    </div>
+    <span class="servo-val" id="servo-val-${item.id}">${item.val}%</span>
+  `;
+  armRowsContainer.appendChild(row);
+});
+
+// =========================================================================
+// THREE.JS 3D SCENE SETUP
+// =========================================================================
+
+const canvas = document.getElementById('gl');
+const labelsCanvas = document.getElementById('labels-canvas');
+const labelsCtx = labelsCanvas.getContext('2d');
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#030712');
-scene.fog = new THREE.FogExp2('#030712', 0.015);
+scene.background = new THREE.Color(0xf6f4f0); // Exact off-white lab background
 
-const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 1000);
-camera.position.set(24, 18, 30);
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(2.8, 1.8, 3.4);
 
-// Undersea / Sci-Fi Lighting
-const ambLight = new THREE.AmbientLight('#002244', 1.2);
-scene.add(ambLight);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 
-const keyLight = new THREE.DirectionalLight('#00f0ff', 2.8);
-keyLight.position.set(20, 30, 20);
-scene.add(keyLight);
+// Resize handling
+function resize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  labelsCanvas.width = w;
+  labelsCanvas.height = h;
+}
+window.addEventListener('resize', resize);
+resize();
 
-const rimLight = new THREE.DirectionalLight('#a855f7', 2.2);
-rimLight.position.set(-20, -10, -20);
+// =========================================================================
+// LIGHTING & SHADOW GROUND
+// =========================================================================
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+scene.add(ambientLight);
+
+const mainKeyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+mainKeyLight.position.set(4, 7, 5);
+mainKeyLight.castShadow = true;
+mainKeyLight.shadow.mapSize.width = 2048;
+mainKeyLight.shadow.mapSize.height = 2048;
+mainKeyLight.shadow.bias = -0.0001;
+mainKeyLight.shadow.camera.near = 0.5;
+mainKeyLight.shadow.camera.far = 15;
+mainKeyLight.shadow.camera.left = -3;
+mainKeyLight.shadow.camera.right = 3;
+mainKeyLight.shadow.camera.top = 3;
+mainKeyLight.shadow.camera.bottom = -3;
+scene.add(mainKeyLight);
+
+const fillLight = new THREE.DirectionalLight(0xffeedd, 0.7);
+fillLight.position.set(-5, 2, -3);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0xddf0ff, 0.9);
+rimLight.position.set(0, -4, -4);
 scene.add(rimLight);
 
-const bottomLight = new THREE.PointLight('#10b981', 1.5, 40);
-bottomLight.position.set(0, -12, 0);
-scene.add(bottomLight);
+// Studio Shadow Receiver Floor
+const floorGeo = new THREE.PlaneGeometry(30, 30);
+const floorMat = new THREE.ShadowMaterial({ opacity: 0.14 });
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -1.1;
+floor.receiveShadow = true;
+scene.add(floor);
 
-// Caustic Grid Floor
-const grid = new THREE.GridHelper(90, 45, '#00f0ff', 'rgba(0,240,255,0.06)');
-grid.position.y = -14;
-scene.add(grid);
+// Ground Grid Lines
+const gridHelper = new THREE.GridHelper(12, 24, 0xd0ccc3, 0xe5e1d7);
+gridHelper.position.y = -1.09;
+scene.add(gridHelper);
 
-// -------------------------------------------------------------------------
-// BUILD OCTOPUS 3D MODEL
-// -------------------------------------------------------------------------
-const octoGroup = new THREE.Group();
-scene.add(octoGroup);
+// =========================================================================
+// MATERIALS PALETTE (Glossy White Ceramic, Anodized Orange, Dark Mechanism)
+// =========================================================================
 
-// Materials
-const matMantle = new THREE.MeshPhysicalMaterial({
-  color: 0x0ea5e9,
-  roughness: 0.25,
+const whiteMat = new THREE.MeshStandardMaterial({
+  color: 0xfaf8f5,
   metalness: 0.1,
-  transmission: 0.75,
-  opacity: 0.95,
+  roughness: 0.22,
+  envMapIntensity: 1.0
+});
+
+const orangeMat = new THREE.MeshStandardMaterial({
+  color: 0xff4800,
+  metalness: 0.4,
+  roughness: 0.28
+});
+
+const darkMechMat = new THREE.MeshStandardMaterial({
+  color: 0x18181a,
+  metalness: 0.8,
+  roughness: 0.35
+});
+
+const carbonMat = new THREE.MeshStandardMaterial({
+  color: 0x222225,
+  roughness: 0.5,
+  metalness: 0.3
+});
+
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: 0xffffff,
+  metalness: 0.1,
+  roughness: 0.05,
+  transmission: 0.92,
   transparent: true,
-  ior: 1.45,
-  thickness: 0.5,
-  clearcoat: 1.0,
-  clearcoatRoughness: 0.1
+  opacity: 1,
+  ior: 1.5
 });
 
-const matArm = new THREE.MeshStandardMaterial({
-  color: 0x0284c7,
-  roughness: 0.35,
-  metalness: 0.2
+const lensMat = new THREE.MeshPhysicalMaterial({
+  color: 0x050b14,
+  metalness: 0.9,
+  roughness: 0.05,
+  transmission: 0.4,
+  reflectivity: 0.9
 });
 
-const matSucker = new THREE.MeshStandardMaterial({
-  color: 0x38bdf8,
-  roughness: 0.2,
-  metalness: 0.5,
-  emissive: 0x004466,
-  emissiveIntensity: 0.6
-});
+// =========================================================================
+// 3D MODEL HIERARCHY: PELAGOS OC-8
+// =========================================================================
 
-const matEye = new THREE.MeshStandardMaterial({
-  color: 0x0f172a,
-  roughness: 0.1,
-  metalness: 0.9
-});
+const robotRoot = new THREE.Group();
+scene.add(robotRoot);
 
-const matPupil = new THREE.MeshBasicMaterial({color: 0x00f0ff});
+// Root groups for exploded displacement
+const coreGroup = new THREE.Group();
+const mantleGroup = new THREE.Group();
+const opticsGroup = new THREE.Group();
+const siphonGroup = new THREE.Group();
+const beakGroup = new THREE.Group();
+const armsGroup = new THREE.Group();
 
-// 1. Dome-shaped Mantle
-const mantleGeo = new THREE.SphereGeometry(3.6, 32, 32);
-mantleGeo.scale(1.0, 1.45, 1.1);
-const mantleMesh = new THREE.Mesh(mantleGeo, matMantle);
-mantleMesh.position.set(0, 3.2, -0.6);
-mantleMesh.rotation.x = -0.3;
-octoGroup.add(mantleMesh);
+robotRoot.add(coreGroup);
+robotRoot.add(mantleGroup);
+robotRoot.add(opticsGroup);
+robotRoot.add(siphonGroup);
+robotRoot.add(beakGroup);
+robotRoot.add(armsGroup);
 
-// Internal Organ / Fluid Core (visible through transparent mantle)
-const coreGeo = new THREE.SphereGeometry(2.0, 24, 24);
-const matCore = new THREE.MeshStandardMaterial({
-  color: 0x00f0ff,
-  emissive: 0x0088cc,
-  emissiveIntensity: 0.9,
-  roughness: 0.2
-});
-const coreMesh = new THREE.Mesh(coreGeo, matCore);
-mantleMesh.add(coreMesh);
+// --- 1. CENTRAL SPHERICAL HULL & CHASSIS ---
+const hullGeo = new THREE.SphereGeometry(0.55, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.65);
+const hullMesh = new THREE.Mesh(hullGeo, whiteMat);
+hullMesh.castShadow = true;
+hullMesh.receiveShadow = true;
+coreGroup.add(hullMesh);
 
-// 2. Lateral Eyes
-function createEye(side) {
-  const g = new THREE.Group();
-  const eM = new THREE.Mesh(new THREE.SphereGeometry(0.85, 20, 20), matEye);
-  g.add(eM);
+// Riveted seam rings & bolt accents
+const ringGeo = new THREE.TorusGeometry(0.552, 0.008, 12, 48);
+const ringMesh = new THREE.Mesh(ringGeo, orangeMat);
+ringMesh.rotation.x = Math.PI / 2;
+coreGroup.add(ringMesh);
 
-  // W-shaped slit pupil
-  const pM = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.14, 0.2), matPupil);
-  pM.position.z = 0.8;
-  g.add(pM);
+// Center core gear / reactor pump cluster inside the hull
+const reactorCoreGroup = new THREE.Group();
+coreGroup.add(reactorCoreGroup);
 
-  g.position.set(side * 2.5, 1.2, 0.8);
-  g.rotation.set(0, side * 0.4, 0);
-  return g;
+const innerCoreMesh = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 18), darkMechMat);
+reactorCoreGroup.add(innerCoreMesh);
+
+// Radial pistons and drive gears inside pump core
+for (let p = 0; p < 7; p++) {
+  const ang = (p / 7) * Math.PI * 2;
+  const piston = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.22, 16), darkMechMat);
+  piston.position.set(Math.cos(ang) * 0.24, 0.08, Math.sin(ang) * 0.24);
+  piston.rotation.z = Math.PI / 2;
+  piston.rotation.y = -ang;
+  reactorCoreGroup.add(piston);
+
+  // Orange hydraulic connector ring
+  const pRing = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.008, 8, 16), orangeMat);
+  pRing.position.copy(piston.position);
+  reactorCoreGroup.add(pRing);
 }
-octoGroup.add(createEye(-1));
-octoGroup.add(createEye(1));
 
-// 3. Siphon Nozzle (Hydro-Jet Thrust Exchanger)
-const siphonGeo = new THREE.CylinderGeometry(0.5, 0.85, 2.2, 20);
-siphonGeo.rotateX(Math.PI / 2.2);
-const matSiphon = new THREE.MeshStandardMaterial({color: 0x0369a1, roughness: 0.3, metalness: 0.4});
-const siphonMesh = new THREE.Mesh(siphonGeo, matSiphon);
-siphonMesh.position.set(0, 0.2, 2.6);
-octoGroup.add(siphonMesh);
+// Drive gear ring
+const gearRing = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.02, 12, 32), orangeMat);
+gearRing.rotation.x = Math.PI / 2;
+gearRing.position.y = 0.05;
+reactorCoreGroup.add(gearRing);
 
-// Siphon Jet Particles
-const jetCount = 200;
-const jetGeo = new THREE.BufferGeometry();
-const jetPos = new Float32Array(jetCount * 3);
-const jetVel = [];
-for (let i = 0; i < jetCount; i++) {
-  jetPos[i * 3 + 0] = (Math.random() - 0.5) * 0.4;
-  jetPos[i * 3 + 1] = 0.2 + (Math.random() - 0.5) * 0.4;
-  jetPos[i * 3 + 2] = 3.2 + Math.random() * 2.0;
-  jetVel.push({
-    x: (Math.random() - 0.5) * 0.15,
-    y: -0.1 + (Math.random() - 0.5) * 0.1,
-    z: 0.8 + Math.random() * 0.9
+// Wire harness tangle (bionic feel)
+const wireCount = 20;
+for (let w = 0; w < wireCount; w++) {
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3((Math.random() - 0.5) * 0.25, -0.1 + Math.random() * 0.2, (Math.random() - 0.5) * 0.25),
+    new THREE.Vector3((Math.random() - 0.5) * 0.45, 0.15 + Math.random() * 0.2, (Math.random() - 0.5) * 0.45),
+    new THREE.Vector3((Math.random() - 0.5) * 0.3, 0.3 + Math.random() * 0.15, (Math.random() - 0.5) * 0.3)
+  ]);
+  const wireGeo = new THREE.TubeGeometry(curve, 16, 0.008, 8, false);
+  const wireMat = Math.random() > 0.4 ? darkMechMat : orangeMat;
+  const wireMesh = new THREE.Mesh(wireGeo, wireMat);
+  reactorCoreGroup.add(wireMesh);
+}
+
+// --- 2. OPTIC ARRAY (Twin 52mm lenses with orange bezel) ---
+const eyeL = createOpticTurret();
+eyeL.position.set(-0.32, 0.05, 0.38);
+eyeL.rotation.y = -0.55;
+eyeL.rotation.x = 0.15;
+opticsGroup.add(eyeL);
+
+const eyeR = createOpticTurret();
+eyeR.position.set(0.32, 0.05, 0.38);
+eyeR.rotation.y = 0.55;
+eyeR.rotation.x = 0.15;
+opticsGroup.add(eyeR);
+
+function createOpticTurret() {
+  const turret = new THREE.Group();
+  
+  // Base socket
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.12, 28), whiteMat);
+  base.rotation.x = Math.PI / 2;
+  base.castShadow = true;
+  turret.add(base);
+
+  // Orange Outer Bezel
+  const bezel = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.02, 16, 32), orangeMat);
+  bezel.position.z = 0.07;
+  turret.add(bezel);
+
+  // Black Inner Barrel
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.08, 28), darkMechMat);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.z = 0.06;
+  turret.add(barrel);
+
+  // Glass Front Element
+  const lens = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5), lensMat);
+  lens.rotation.x = -Math.PI / 2;
+  lens.position.z = 0.08;
+  turret.add(lens);
+
+  // Center optical IR dot
+  const irDot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), orangeMat);
+  irDot.position.z = 0.09;
+  turret.add(irDot);
+
+  return turret;
+}
+
+// --- 3. MANTLE SHELL (6 Articulated Petals that Blossom Open) ---
+const mantlePetals = [];
+const numPetals = 6;
+for (let i = 0; i < numPetals; i++) {
+  const petalPivot = new THREE.Group();
+  const angle = (i / numPetals) * Math.PI * 2;
+  
+  petalPivot.rotation.y = angle;
+  petalPivot.position.set(0, 0.25, 0);
+
+  // Petal shell geometry
+  const petalGeo = new THREE.CylinderGeometry(0.38, 0.58, 0.45, 12, 1, false, -0.45, 0.9);
+  const petalMesh = new THREE.Mesh(petalGeo, whiteMat);
+  petalMesh.position.set(0, 0.18, 0.12);
+  petalMesh.rotation.x = -0.35;
+  petalMesh.castShadow = true;
+  petalMesh.receiveShadow = true;
+  petalPivot.add(petalMesh);
+
+  // Glass Inspection Port on petal
+  const portBezel = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.012, 12, 24), orangeMat);
+  portBezel.position.set(0, 0.22, 0.48);
+  portBezel.rotation.x = -0.35;
+  petalPivot.add(portBezel);
+
+  const portGlass = new THREE.Mesh(new THREE.CircleGeometry(0.065, 20), glassMat);
+  portGlass.position.copy(portBezel.position);
+  portGlass.rotation.copy(portBezel.rotation);
+  petalPivot.add(portGlass);
+
+  // Hinge strut
+  const hinge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.08, 0.06), darkMechMat);
+  hinge.position.set(0, 0.02, 0.2);
+  petalPivot.add(hinge);
+
+  mantleGroup.add(petalPivot);
+  mantlePetals.push({ pivot: petalPivot, baseAngle: angle, mesh: petalMesh });
+}
+
+// Mantle Top Cap
+const topCapGeo = new THREE.CylinderGeometry(0.24, 0.32, 0.08, 24);
+const topCap = new THREE.Mesh(topCapGeo, whiteMat);
+topCap.position.y = 0.62;
+topCap.castShadow = true;
+mantleGroup.add(topCap);
+
+const topCapBezel = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.015, 12, 32), orangeMat);
+topCapBezel.rotation.x = Math.PI / 2;
+topCapBezel.position.y = 0.66;
+mantleGroup.add(topCapBezel);
+
+// --- 4. VENTRAL SIPHON JET NOZZLE ---
+const siphonMesh = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.35, 24, 1, true), whiteMat);
+siphonMesh.rotation.x = -Math.PI / 2 + 0.4;
+siphonMesh.position.set(0, -0.4, 0.32);
+siphonMesh.castShadow = true;
+siphonGroup.add(siphonMesh);
+
+const siphonRing = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.015, 12, 24), orangeMat);
+siphonRing.position.copy(siphonMesh.position);
+siphonRing.rotation.copy(siphonMesh.rotation);
+siphonGroup.add(siphonRing);
+
+// --- 5. VENTRAL BEAK ASSEMBLY ---
+const beakJaw = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 4), darkMechMat);
+beakJaw.rotation.x = Math.PI;
+beakJaw.position.set(0, -0.5, 0);
+beakGroup.add(beakJaw);
+
+// --- 6. 8 ARTICULATED CONTINUUM TENTACLE ARMS ---
+// 4 on Right (R1..R4), 4 on Left (L1..L4)
+const arms = [];
+const numArms = 8;
+const linksPerArm = 11;
+
+for (let a = 0; a < numArms; a++) {
+  const armId = a < 4 ? `R${a + 1}` : `L${a - 3}`;
+  const isRight = a < 4;
+  
+  // Base angle distributed radially around the bottom ring
+  const baseAngle = (a / numArms) * Math.PI * 2;
+  
+  const armRoot = new THREE.Group();
+  armRoot.position.set(Math.cos(baseAngle) * 0.46, -0.3, Math.sin(baseAngle) * 0.46);
+  armRoot.rotation.y = -baseAngle + Math.PI / 2;
+  armsGroup.add(armRoot);
+
+  // Root actuator socket
+  const socketMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.1, 16), darkMechMat);
+  socketMesh.rotation.x = Math.PI / 2;
+  armRoot.add(socketMesh);
+
+  const socketBezel = new THREE.Mesh(new THREE.TorusGeometry(0.125, 0.015, 10, 20), orangeMat);
+  armRoot.add(socketBezel);
+
+  // Chain of segmented links
+  const linkObjects = [];
+  let prevParent = armRoot;
+
+  for (let l = 0; l < linksPerArm; l++) {
+    const linkGroup = new THREE.Group();
+    // Distance from previous joint
+    const linkLen = 0.16 * Math.pow(0.94, l);
+    linkGroup.position.z = l === 0 ? 0.08 : linkLen;
+
+    const radius = 0.11 * Math.pow(0.92, l);
+    
+    // Armored cylindrical white shell
+    const shell = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.88, radius, linkLen, 16), whiteMat);
+    shell.rotation.x = Math.PI / 2;
+    shell.position.z = linkLen / 2;
+    shell.castShadow = true;
+    linkGroup.add(shell);
+
+    // Orange joint ring collar
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(radius * 1.02, 0.01, 8, 16), orangeMat);
+    collar.position.z = 0.01;
+    linkGroup.add(collar);
+
+    // Suction wheels / cups on ventral underside
+    const suction = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.45, radius * 0.48, 0.04, 12), orangeMat);
+    suction.position.set(0, -radius * 0.95, linkLen / 2);
+    suction.rotation.x = Math.PI / 2;
+    linkGroup.add(suction);
+
+    const suctionHole = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.32, 10), darkMechMat);
+    suctionHole.position.set(0, -radius * 0.98, linkLen / 2);
+    suctionHole.rotation.x = Math.PI / 2;
+    linkGroup.add(suctionHole);
+
+    prevParent.add(linkGroup);
+    linkObjects.push(linkGroup);
+    prevParent = linkGroup;
+  }
+
+  arms.push({
+    id: armId,
+    root: armRoot,
+    baseAngle,
+    links: linkObjects,
+    curlOffset: a * 0.7,
+    isApart: false,
+    apartOffset: 0
   });
 }
-jetGeo.setAttribute('position', new THREE.BufferAttribute(jetPos, 3));
-const matJet = new THREE.PointsMaterial({
-  color: 0x00f0ff,
-  size: 0.4,
-  transparent: true,
-  opacity: 0.8,
-  blending: THREE.AdditiveBlending
+
+// =========================================================================
+// CALLOUT LABELS & LEADER LINES (Exact 3D coordinates mapped to 2D)
+// =========================================================================
+
+const calloutDefs = [
+  { id: 'optics', text: 'OPTIC ARRAY', sub: '2 x 52 MM LENS · IR RIM', getPos: () => eyeR.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.1, 0.05, 0.1)) },
+  { id: 'mantle', text: 'SHELL PETAL', sub: '6 x HINGED · GLASS PORT', getPos: () => mantlePetals[1].pivot.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.4, 0.3)) },
+  { id: 'reactor', text: 'REACTOR RING', sub: 'PUMP DRIVE · 7 PISTONS', getPos: () => reactorCoreGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.1, 0)) },
+  { id: 'drive', text: 'DRIVE GEARS', sub: '44 x 36 TEETH', getPos: () => reactorCoreGroup.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.2, -0.05, -0.1)) },
+  { id: 'root', text: 'ROOT ACTUATOR', sub: 'ARM R2 · 3 DOF', getPos: () => arms[1].root.getWorldPosition(new THREE.Vector3()) },
+  { id: 'glass_link', text: 'GLASS LINK', sub: 'GEAR TRAIN', getPos: () => arms[1].links[3].getWorldPosition(new THREE.Vector3()) },
+  { id: 'wheels', text: 'ARM CHAINS', sub: '282 LINKS · 489 WHEELS', getPos: () => arms[4].links[5].getWorldPosition(new THREE.Vector3()) },
+  { id: 'siphon', text: 'SIPHON JET', sub: 'VECTOR NOZZLE', getPos: () => siphonMesh.getWorldPosition(new THREE.Vector3()) }
+];
+
+// Create DOM label elements
+const domLabels = [];
+calloutDefs.forEach(def => {
+  const el = document.createElement('div');
+  el.className = 'dom-label';
+  el.innerHTML = `${def.text}<span class="sub">${def.sub}</span>`;
+  document.getElementById('canvas-container').appendChild(el);
+  domLabels.push({ def, el });
 });
-const jetParticles = new THREE.Points(jetGeo, matJet);
-octoGroup.add(jetParticles);
 
-// 4. Eight Articulated Continuum Tentacles
-const armCount = 8;
-const segPerArm = 14;
-const arms = [];
+// =========================================================================
+// INTERACTIVE STATE & CONTROLS
+// =========================================================================
 
-for (let i = 0; i < armCount; i++) {
-  const radAngle = (i / armCount) * Math.PI * 2;
-  const armRoot = new THREE.Group();
-  armRoot.position.set(Math.cos(radAngle) * 2.0, -0.2, Math.sin(radAngle) * 2.0);
-  armRoot.rotation.y = radAngle;
+let currentAssembly = 'hero'; // 'hero', 'optics', 'mantle', 'arm-r2', 'siphon', 'beak'
+let showLabels = true;
+let isExploded = false;
+let isTurntable = false;
+let isPlaying = true;
+let showJetWake = false;
 
-  const segs = [];
-  let parent = armRoot;
+let mantleOpenFactor = 0; // 0 (sealed) to 1 (fully open)
+let armApartFactor = 0;   // 0 (curled) to 1 (straight disassembled line)
+let explodedFactor = 0;   // 0 (assembled) to 1 (exploded teardown)
 
-  for (let j = 0; j < segPerArm; j++) {
-    const t = j / segPerArm;
-    const rTop = (1.0 - t) * 0.6 + 0.12;
-    const rBot = (1.0 - (t + 1 / segPerArm)) * 0.6 + 0.12;
-    const len = 1.1;
+// Camera animation targets
+let camTargetPos = new THREE.Vector3(2.8, 1.8, 3.4);
+let camLookAt = new THREE.Vector3(0, 0, 0);
+let currentLookAt = new THREE.Vector3(0, 0, 0);
 
-    const segGeo = new THREE.CylinderGeometry(rBot, rTop, len, 16);
-    segGeo.translate(0, -len / 2, 0);
-
-    const segMesh = new THREE.Mesh(segGeo, matArm);
-    segMesh.castShadow = true;
-
-    // Underside Suction Pad
-    const suckerGeo = new THREE.CylinderGeometry(rTop * 0.5, rTop * 0.6, 0.12, 12);
-    suckerGeo.rotateX(Math.PI / 2);
-    const suckerMesh = new THREE.Mesh(suckerGeo, matSucker);
-    suckerMesh.position.set(0, -len / 2, -rTop);
-    segMesh.add(suckerMesh);
-
-    parent.add(segMesh);
-
-    const nextJoint = new THREE.Group();
-    nextJoint.position.set(0, -len, 0);
-    segMesh.add(nextJoint);
-
-    segs.push(segMesh);
-    parent = nextJoint;
-  }
-
-  octoGroup.add(armRoot);
-  arms.push({root: armRoot, segs, angle: radAngle});
-}
-
-// -------------------------------------------------------------------------
-// INTERACTIVE CAMERA CONTROLS
-// -------------------------------------------------------------------------
-let isDragging = false;
-let prevPointer = {x: 0, y: 0};
-let camSpherical = {radius: 42, theta: 0.6, phi: 1.1};
-let camTarget = new THREE.Vector3(0, 0, 0);
-
-function updateCam() {
-  camSpherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, camSpherical.phi));
-  camSpherical.radius = Math.max(12, Math.min(90, camSpherical.radius));
-  camera.position.x = camTarget.x + camSpherical.radius * Math.sin(camSpherical.phi) * Math.sin(camSpherical.theta);
-  camera.position.y = camTarget.y + camSpherical.radius * Math.cos(camSpherical.phi);
-  camera.position.z = camTarget.z + camSpherical.radius * Math.sin(camSpherical.phi) * Math.cos(camSpherical.theta);
-  camera.lookAt(camTarget);
-}
-updateCam();
+// Orbit Controls implementation
+let isPointerDown = false;
+let prevPointerX = 0;
+let prevPointerY = 0;
+let spherical = new THREE.Spherical(4.8, Math.PI / 2.7, 0.8);
 
 canvas.addEventListener('pointerdown', (e) => {
-  isDragging = true;
-  prevPointer = {x: e.clientX, y: e.clientY};
-  canvas.style.cursor = 'grabbing';
-});
-
-window.addEventListener('pointermove', (e) => {
-  if (!isDragging) return;
-  const dx = e.clientX - prevPointer.x;
-  const dy = e.clientY - prevPointer.y;
-  prevPointer = {x: e.clientX, y: e.clientY};
-
-  if (e.buttons === 2 || e.shiftKey) {
-    const right = new THREE.Vector3().crossVectors(camera.up, camera.getWorldDirection(new THREE.Vector3())).normalize();
-    camTarget.addScaledVector(right, dx * 0.05);
-    camTarget.y += dy * 0.05;
-  } else {
-    camSpherical.theta -= dx * 0.007;
-    camSpherical.phi -= dy * 0.007;
-  }
-  updateCam();
+  isPointerDown = true;
+  prevPointerX = e.clientX;
+  prevPointerY = e.clientY;
+  canvas.classList.add('grabbing');
 });
 
 window.addEventListener('pointerup', () => {
-  isDragging = false;
-  canvas.style.cursor = 'grab';
+  isPointerDown = false;
+  canvas.classList.remove('grabbing');
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!isPointerDown) return;
+  const dx = e.clientX - prevPointerX;
+  const dy = e.clientY - prevPointerY;
+  prevPointerX = e.clientX;
+  prevPointerY = e.clientY;
+
+  spherical.theta -= dx * 0.007;
+  spherical.phi -= dy * 0.007;
+  spherical.phi = Math.max(0.1, Math.min(Math.PI / 2 - 0.05, spherical.phi));
+  
+  if (isTurntable) {
+    isTurntable = false;
+    document.getElementById('btn-turntable').classList.remove('active');
+  }
 });
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  camSpherical.radius *= Math.exp(e.deltaY * 0.001);
-  updateCam();
-}, {passive: false});
+  spherical.radius += e.deltaY * 0.004;
+  spherical.radius = Math.max(1.8, Math.min(9.0, spherical.radius));
+}, { passive: false });
 
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
-// -------------------------------------------------------------------------
-// UI & EVENT HANDLERS
-// -------------------------------------------------------------------------
-let pulseSpeed = 1.0;
-let waveAmp = 100;
-let gaitMode = 'swim';
-let isPaused = false;
-let isGlow = false;
-
-const speedSlider = document.getElementById('speed-slider');
-const speedLabel = document.getElementById('speed-label');
-speedSlider.addEventListener('input', (e) => {
-  pulseSpeed = parseFloat(e.target.value);
-  speedLabel.innerText = `${pulseSpeed.toFixed(1)}× (${(1.2 * pulseSpeed).toFixed(1)} Hz)`;
+// Assembly Switcher
+const assemblyButtons = document.querySelectorAll('[data-assembly]');
+assemblyButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    assemblyButtons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    setAssemblyMode(btn.dataset.assembly);
+  });
 });
 
-const ampSlider = document.getElementById('amp-slider');
-const ampLabel = document.getElementById('amp-label');
-ampSlider.addEventListener('input', (e) => {
-  waveAmp = parseInt(e.target.value);
-  ampLabel.innerText = `${waveAmp}%`;
+function setAssemblyMode(mode) {
+  currentAssembly = mode;
+  const titleEl = document.getElementById('mode-title');
+  const descEl = document.getElementById('mode-desc');
+  const statusBadge = document.getElementById('val-status');
+  const statusText = document.getElementById('val-status-text');
+  const timelineOp = document.getElementById('timeline-operator-text');
+
+  // Subsystem tag updates
+  const subMantle = document.getElementById('sub-mantle-tag');
+  const subPump = document.getElementById('sub-pump-tag');
+  const subArm = document.getElementById('sub-arm-tag');
+  const armModeTag = document.getElementById('arm-mode-tag');
+
+  if (mode === 'hero') {
+    titleEl.textContent = 'HOLDING';
+    descEl.textContent = 'STATION KEEPING · 12.42 M DEPTH';
+    statusText.textContent = 'HOLDING';
+    statusBadge.className = 'status-badge';
+    timelineOp.textContent = 'OPERATOR · HERO · RELEASE';
+    subMantle.textContent = 'SEALED';
+    subMantle.className = 'subsys-tag green';
+    subPump.textContent = 'RUNNING';
+    subPump.className = 'subsys-tag green';
+    subArm.textContent = '8/8 LOCKED';
+    subArm.className = 'subsys-tag green';
+    armModeTag.textContent = 'CURLING';
+    armModeTag.className = 'subsys-tag green';
+    spherical.radius = 4.8;
+    spherical.phi = Math.PI / 2.7;
+    camLookAt.set(0, 0, 0);
+  } else if (mode === 'mantle') {
+    titleEl.textContent = 'MANTLE OPEN';
+    descEl.textContent = 'PETALS · 63% APART';
+    statusText.textContent = 'MANTLE OPEN';
+    statusBadge.className = 'status-badge orange';
+    timelineOp.textContent = 'OPERATOR · ISOLATE MANTLE';
+    subMantle.textContent = 'OPEN';
+    subMantle.className = 'subsys-tag orange';
+    subPump.textContent = 'EXPOSED';
+    subPump.className = 'subsys-tag orange';
+    spherical.radius = 3.6;
+    spherical.phi = Math.PI / 3.4;
+    camLookAt.set(0, 0.35, 0);
+  } else if (mode === 'arm-r2') {
+    titleEl.textContent = 'ARM R2 APART';
+    descEl.textContent = 'ARM R2 · 48% APART';
+    statusText.textContent = 'ARM R2 APART';
+    statusBadge.className = 'status-badge orange';
+    timelineOp.textContent = 'OPERATOR · ISOLATE ARM R2';
+    subArm.textContent = 'DETACHED';
+    subArm.className = 'subsys-tag orange';
+    armModeTag.textContent = 'DETACHED';
+    armModeTag.className = 'subsys-tag orange';
+    spherical.radius = 4.2;
+    spherical.phi = Math.PI / 2.5;
+    spherical.theta = 0.6;
+    camLookAt.set(0.6, 0.1, 0);
+  } else if (mode === 'optics') {
+    titleEl.textContent = 'OPTIC ARRAY';
+    descEl.textContent = 'DUAL 52 MM · TRACKING CALIBRATION';
+    statusText.textContent = 'OPTICS';
+    statusBadge.className = 'status-badge';
+    timelineOp.textContent = 'OPERATOR · ISOLATE OPTICS';
+    spherical.radius = 2.4;
+    spherical.phi = Math.PI / 2.3;
+    spherical.theta = 0.2;
+    camLookAt.set(0, 0.05, 0.35);
+  } else if (mode === 'siphon') {
+    titleEl.textContent = 'SIPHON JET';
+    descEl.textContent = 'VECTOR NOZZLE · HYDRO PROPULSION';
+    statusText.textContent = 'SIPHON';
+    statusBadge.className = 'status-badge';
+    timelineOp.textContent = 'OPERATOR · ISOLATE SIPHON';
+    spherical.radius = 2.6;
+    spherical.phi = Math.PI / 1.9;
+    camLookAt.set(0, -0.35, 0.2);
+  } else if (mode === 'beak') {
+    titleEl.textContent = 'BEAK JAW';
+    descEl.textContent = 'RADULA FEED MECHANISM';
+    statusText.textContent = 'BEAK';
+    statusBadge.className = 'status-badge';
+    timelineOp.textContent = 'OPERATOR · ISOLATE BEAK';
+    spherical.radius = 2.6;
+    spherical.phi = Math.PI / 1.6;
+    camLookAt.set(0, -0.45, 0);
+  }
+}
+
+// Display Buttons
+const btnLabels = document.getElementById('btn-labels');
+btnLabels.addEventListener('click', () => {
+  showLabels = !showLabels;
+  btnLabels.classList.toggle('active', showLabels);
 });
 
-const btnPause = document.getElementById('btn-pause');
-btnPause.addEventListener('click', () => {
-  isPaused = !isPaused;
-  btnPause.innerText = isPaused ? 'Play [Space]' : 'Pause [Space]';
-  btnPause.style.borderColor = isPaused ? '#ffd700' : 'rgba(255,255,255,0.12)';
-});
-
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') {
-    e.preventDefault();
-    btnPause.click();
+const btnExploded = document.getElementById('btn-exploded');
+btnExploded.addEventListener('click', () => {
+  isExploded = !isExploded;
+  btnExploded.classList.toggle('active', isExploded);
+  const titleEl = document.getElementById('mode-title');
+  const descEl = document.getElementById('mode-desc');
+  if (isExploded) {
+    titleEl.textContent = 'TEARDOWN';
+    descEl.textContent = 'TURNTABLE 104° · 100% APART';
+    document.getElementById('val-status-text').textContent = 'TEARDOWN';
+    document.getElementById('val-status').className = 'status-badge orange';
+    document.getElementById('timeline-operator-text').textContent = 'OPERATOR · EXPLODED ON';
+  } else {
+    setAssemblyMode(currentAssembly);
   }
 });
 
-const btnGlow = document.getElementById('btn-glow');
-btnGlow.addEventListener('click', () => {
-  isGlow = !isGlow;
-  matArm.emissive = new THREE.Color(isGlow ? 0x00f0ff : 0x000000);
-  matArm.emissiveIntensity = isGlow ? 0.6 : 0;
-  btnGlow.style.background = isGlow ? 'rgba(0,240,255,0.2)' : 'rgba(255,255,255,0.06)';
-  btnGlow.style.borderColor = isGlow ? '#00f0ff' : 'rgba(255,255,255,0.12)';
+const btnTurntable = document.getElementById('btn-turntable');
+btnTurntable.addEventListener('click', () => {
+  isTurntable = !isTurntable;
+  btnTurntable.classList.toggle('active', isTurntable);
 });
 
-document.querySelectorAll('.gait-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.gait-btn').forEach(b => {
-      b.style.background = 'rgba(255,255,255,0.06)';
-      b.style.borderColor = 'rgba(255,255,255,0.12)';
-      b.style.color = '#e2e8f0';
-    });
-    btn.style.background = 'rgba(0,240,255,0.18)';
-    btn.style.borderColor = '#00f0ff';
-    btn.style.color = '#00f0ff';
-    gaitMode = btn.dataset.gait;
-  });
+const btnJetWake = document.getElementById('btn-jetwake');
+btnJetWake.addEventListener('click', () => {
+  showJetWake = !showJetWake;
+  btnJetWake.classList.toggle('active', showJetWake);
 });
 
-document.querySelectorAll('.cam-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.cam-btn').forEach(b => {
-      b.style.background = 'rgba(255,255,255,0.06)';
-      b.style.color = '#e2e8f0';
-    });
-    btn.style.background = 'rgba(0,240,255,0.15)';
-    btn.style.color = '#00f0ff';
-
-    const camType = btn.dataset.cam;
-    if (camType === 'orbit') {
-      camSpherical = {radius: 42, theta: 0.6, phi: 1.1};
-      camTarget.set(0, 0, 0);
-    } else if (camType === 'top') {
-      camSpherical = {radius: 38, theta: 0.0, phi: 0.05};
-      camTarget.set(0, 0, 0);
-    } else if (camType === 'siphon') {
-      camSpherical = {radius: 18, theta: 0.0, phi: 1.5};
-      camTarget.set(0, 0.5, 2.5);
-    } else if (camType === 'tentacle') {
-      camSpherical = {radius: 16, theta: 1.8, phi: 1.8};
-      camTarget.set(3, -4, 0);
-    }
-    updateCam();
-  });
+const btnPlay = document.getElementById('btn-play');
+const playIcon = document.getElementById('play-icon');
+btnPlay.addEventListener('click', () => {
+  isPlaying = !isPlaying;
+  if (isPlaying) {
+    playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+  } else {
+    playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+  }
 });
 
-window.addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
+// =========================================================================
+// REAL-TIME GRAPHS & TELEMETRY UPDATES
+// =========================================================================
 
-// -------------------------------------------------------------------------
-// CONTINUUM HYDRODYNAMICS & KINEMATICS LOOP
-// -------------------------------------------------------------------------
-let clock = 0;
-let lastTime = performance.now();
+const jetCanvas = document.getElementById('jet-canvas');
+const jetCtx = jetCanvas.getContext('2d');
+let waveOffset = 0;
 
-function animate(now) {
+function drawJetWave(time) {
+  jetCtx.clearRect(0, 0, jetCanvas.width, jetCanvas.height);
+  
+  // Grid line
+  jetCtx.strokeStyle = '#e8e5de';
+  jetCtx.lineWidth = 1;
+  jetCtx.beginPath();
+  jetCtx.moveTo(0, jetCanvas.height / 2);
+  jetCtx.lineTo(jetCanvas.width, jetCanvas.height / 2);
+  jetCtx.stroke();
+
+  // Wave path
+  jetCtx.strokeStyle = '#ff4800';
+  jetCtx.lineWidth = 1.8;
+  jetCtx.beginPath();
+
+  const w = jetCanvas.width;
+  const h = jetCanvas.height;
+  const mid = h / 2;
+  const amp = currentAssembly === 'mantle' ? 14 : (isPlaying ? 8 : 2);
+
+  for (let x = 0; x < w; x++) {
+    const progress = x / w;
+    const envelope = Math.sin(progress * Math.PI);
+    const y = mid - Math.sin((x * 0.08) - waveOffset) * amp * envelope;
+    if (x === 0) jetCtx.moveTo(x, y);
+    else jetCtx.lineTo(x, y);
+  }
+  jetCtx.stroke();
+
+  // Current pulse red dot at right edge
+  const endY = mid - Math.sin((w * 0.08) - waveOffset) * amp * Math.sin(Math.PI);
+  jetCtx.fillStyle = '#ff4800';
+  jetCtx.beginPath();
+  jetCtx.arc(w - 4, endY, 3, 0, Math.PI * 2);
+  jetCtx.fill();
+}
+
+// =========================================================================
+// ANIMATION LOOP
+// =========================================================================
+
+let clock = new THREE.Clock();
+let elapsedSimTime = 8 * 60 + 6; // starts at 00:08:06
+
+function animate() {
   requestAnimationFrame(animate);
 
-  const dt = Math.min((now - lastTime) / 1000, 0.1);
-  lastTime = now;
+  const delta = clock.getDelta();
+  const time = clock.getElapsedTime();
 
-  if (!isPaused) {
-    clock += dt * pulseSpeed * 3.5;
+  if (isPlaying) {
+    waveOffset += delta * 4;
+    elapsedSimTime += delta;
+
+    // Turntable rotation
+    if (isTurntable) {
+      spherical.theta += delta * 0.35;
+    }
   }
 
-  // 1. Mantle Pulsation (Siphon jet pressure intake & contraction)
-  const pulsePhase = clock % (Math.PI * 2);
-  const isExpelling = Math.sin(pulsePhase) > 0.3;
-  const mantleScaleX = 1.0 + Math.sin(pulsePhase) * 0.14;
-  const mantleScaleY = 1.45 - Math.sin(pulsePhase) * 0.18;
-  mantleMesh.scale.set(mantleScaleX, mantleScaleY, mantleScaleX);
+  // Camera lerp
+  const targetCamPos = new THREE.Vector3().setFromSpherical(spherical).add(camLookAt);
+  camera.position.lerp(targetCamPos, 0.08);
+  currentLookAt.lerp(camLookAt, 0.08);
+  camera.lookAt(currentLookAt);
 
-  // Overall Octopus Translation / Surge
-  if (gaitMode === 'swim') {
-    octoGroup.position.y = Math.sin(clock * 0.8) * 1.5;
-    octoGroup.position.z = Math.cos(clock * 0.8) * 1.2;
-    octoGroup.rotation.x = -0.3 + Math.sin(clock * 0.8) * 0.15;
-  } else {
-    // Floor crawl posture
-    octoGroup.position.y = -6.0 + Math.sin(clock * 0.4) * 0.3;
-    octoGroup.position.z = 0;
-    octoGroup.rotation.x = 0.2;
+  // Smoothly blend mode factors
+  const targetMantleOpen = (currentAssembly === 'mantle' || isExploded) ? 1.0 : 0.0;
+  mantleOpenFactor += (targetMantleOpen - mantleOpenFactor) * 0.08;
+
+  const targetArmApart = (currentAssembly === 'arm-r2') ? 1.0 : 0.0;
+  armApartFactor += (targetArmApart - armApartFactor) * 0.08;
+
+  const targetExploded = isExploded ? 1.0 : 0.0;
+  explodedFactor += (targetExploded - explodedFactor) * 0.08;
+
+  // --- 1. MANTLE PETALS BLOSSOM ANIMATION ---
+  mantlePetals.forEach((petal, idx) => {
+    // Petal pivots swing outwards
+    const openAngle = 0.72 * mantleOpenFactor + (0.45 * explodedFactor);
+    petal.pivot.rotation.x = openAngle;
+    
+    // Radial separation in exploded mode
+    const radialDist = explodedFactor * 0.45;
+    petal.pivot.position.set(
+      Math.sin(petal.baseAngle) * radialDist,
+      0.25 + (explodedFactor * 0.35),
+      Math.cos(petal.baseAngle) * radialDist
+    );
+  });
+
+  topCap.position.y = 0.62 + (mantleOpenFactor * 0.25) + (explodedFactor * 0.65);
+  topCapBezel.position.y = 0.66 + (mantleOpenFactor * 0.25) + (explodedFactor * 0.65);
+
+  // --- 2. REACTOR CORE & DRIVE GEARS ROTATION ---
+  if (isPlaying) {
+    reactorCoreGroup.rotation.y += delta * 1.2;
   }
+  reactorCoreGroup.position.y = explodedFactor * 0.35;
 
-  // 2. Eight Continuum Arms Kinematics
-  const ampNorm = waveAmp / 100;
-  for (let i = 0; i < armCount; i++) {
-    const arm = arms[i];
-    const armPhase = clock + i * (Math.PI / 4);
+  // --- 3. OPTIC ARRAY DISPLACEMENT ---
+  opticsGroup.position.z = explodedFactor * 0.4;
 
-    for (let j = 0; j < segPerArm; j++) {
-      const seg = arm.segs[j];
-      const jointDist = j / segPerArm;
+  // --- 4. VENTRAL SIPHON & BEAK DISPLACEMENT ---
+  siphonGroup.position.y = -explodedFactor * 0.45;
+  beakGroup.position.y = -explodedFactor * 0.6;
 
-      if (gaitMode === 'swim') {
-        // Coordinated Jet Swim: Opening and closing bell stroke + traveling wave
-        const swimContract = Math.sin(pulsePhase) * 0.4;
-        const waveAngle = Math.sin(armPhase - jointDist * 3.5) * 0.25 * ampNorm;
-        seg.rotation.x = (-0.15 - swimContract + waveAngle);
-        seg.rotation.z = Math.sin(armPhase * 0.5 + jointDist * 2) * 0.08;
+  // --- 5. TENTACLE ARMS WAVE KINEMATICS & APART DISASSEMBLY ---
+  arms.forEach((arm, aIdx) => {
+    const isIsolatedR2 = (arm.id === 'R2');
+    const apartBlend = isIsolatedR2 ? armApartFactor : 0.0;
+
+    // Displace root in exploded / apart mode
+    const expX = Math.cos(arm.baseAngle) * (explodedFactor * 0.55);
+    const expZ = Math.sin(arm.baseAngle) * (explodedFactor * 0.55);
+
+    if (isIsolatedR2 && apartBlend > 0.01) {
+      // Pull Arm R2 out and orient it horizontally for clear teardown inspection
+      arm.root.position.set(
+        1.1 * apartBlend + expX,
+        -0.1 * apartBlend,
+        0.3 * apartBlend + expZ
+      );
+      arm.root.rotation.set(0, Math.PI / 2, 0);
+    } else {
+      arm.root.position.set(
+        Math.cos(arm.baseAngle) * 0.46 + expX,
+        -0.3 - (explodedFactor * 0.2),
+        Math.sin(arm.baseAngle) * 0.46 + expZ
+      );
+      arm.root.rotation.set(0, -arm.baseAngle + Math.PI / 2, 0);
+    }
+
+    // Articulated Continuum Wave Curl
+    arm.links.forEach((link, lIdx) => {
+      if (isIsolatedR2 && apartBlend > 0.01) {
+        // Explode links linearly horizontally like in user screenshot 3
+        const spreadDistance = lIdx * 0.12 * apartBlend;
+        link.position.z = 0.16 + spreadDistance;
+        link.rotation.x = (1 - apartBlend) * 0.15;
+        link.rotation.y = 0;
+        link.rotation.z = 0;
       } else {
-        // Crawling gait: Alternating tactile ground search & pull
-        const crawlAngle = Math.sin(clock * 1.2 + i * 1.1 - jointDist * 4) * 0.35 * ampNorm;
-        seg.rotation.x = (0.2 + crawlAngle);
-        seg.rotation.z = Math.cos(clock * 1.2 + i * 0.8) * 0.12;
+        // Natural cephalopod undulating curl
+        const wavePhase = time * 2.2 - (lIdx * 0.4) + arm.curlOffset;
+        const breathing = Math.sin(time * 1.4 + aIdx * 0.5) * 0.08;
+        
+        const curlX = Math.sin(wavePhase) * (0.12 + lIdx * 0.02) + 0.12 + breathing;
+        const curlY = Math.cos(wavePhase * 0.7) * (0.04 + lIdx * 0.015);
+        
+        link.rotation.x = isPlaying ? curlX : 0.15;
+        link.rotation.y = isPlaying ? curlY : 0;
+        link.rotation.z = 0;
       }
-    }
-  }
+    });
+  });
 
-  // 3. Siphon Thrust Jet Particles
-  const jetPositions = jetGeo.attributes.position.array;
-  for (let i = 0; i < jetCount; i++) {
-    const idx = i * 3;
-    if (isExpelling) {
-      jetPositions[idx + 0] += jetVel[i].x;
-      jetPositions[idx + 1] += jetVel[i].y;
-      jetPositions[idx + 2] += jetVel[i].z * pulseSpeed;
-    }
+  // --- 6. FLOATING 3D SCREEN-SPACE CALLOUT LABELS & LINES ---
+  renderScreenLabels();
 
-    if (jetPositions[idx + 2] > 20 || !isExpelling) {
-      jetPositions[idx + 0] = (Math.random() - 0.5) * 0.4;
-      jetPositions[idx + 1] = 0.2 + (Math.random() - 0.5) * 0.4;
-      jetPositions[idx + 2] = 3.0 + Math.random() * 0.8;
-    }
-  }
-  jetGeo.attributes.position.needsUpdate = true;
-  jetParticles.visible = isExpelling;
-
-  // 4. Update Real-Time Telemetry HUD
-  const thrust = isExpelling ? (40.0 + Math.sin(pulsePhase) * 35.0 * pulseSpeed) : 4.5;
-  const pressure = isExpelling ? (160 + Math.sin(pulsePhase) * 60 * pulseSpeed) : 85.0;
-  const volume = 4.2 + Math.sin(pulsePhase) * 1.2;
-  document.getElementById('ui-thrust-val').innerText = `${thrust.toFixed(1)} N`;
-  document.getElementById('stat-pres').innerText = `${pressure.toFixed(1)} kPa`;
-  document.getElementById('stat-vol').innerText = `${volume.toFixed(2)} L`;
-  document.getElementById('stat-curve').innerText = `${(1.1 + Math.sin(pulsePhase) * 0.6 * ampNorm).toFixed(2)} rad/m`;
+  // --- 7. TELEMETRY & GRAPHS ---
+  drawJetWave(time);
+  updateTelemetryUI(time);
 
   renderer.render(scene, camera);
 }
 
-requestAnimationFrame(animate);
+// Render Callout Labels on HTML5 2D Canvas
+function renderScreenLabels() {
+  labelsCtx.clearRect(0, 0, labelsCanvas.width, labelsCanvas.height);
+  
+  if (!showLabels) {
+    domLabels.forEach(item => { item.el.style.opacity = '0'; });
+    return;
+  }
+
+  const w = labelsCanvas.width;
+  const h = labelsCanvas.height;
+
+  domLabels.forEach(item => {
+    const pos3D = item.def.getPos();
+    const screenPos = pos3D.clone().project(camera);
+
+    // Behind camera check
+    if (screenPos.z > 1.0) {
+      item.el.style.opacity = '0';
+      return;
+    }
+
+    const x = (screenPos.x * 0.5 + 0.5) * w;
+    const y = (-screenPos.y * 0.5 + 0.5) * h;
+
+    // Offset label position nicely
+    const offsetX = screenPos.x > 0 ? 55 : -140;
+    const offsetY = screenPos.y > 0 ? -35 : 35;
+    const labelX = x + offsetX;
+    const labelY = y + offsetY;
+
+    item.el.style.left = `${labelX}px`;
+    item.el.style.top = `${labelY}px`;
+    item.el.style.opacity = '1';
+
+    // Draw dogleg leader line
+    labelsCtx.strokeStyle = 'rgba(255, 72, 0, 0.65)';
+    labelsCtx.lineWidth = 1.2;
+    labelsCtx.setLineDash([2, 2]);
+
+    labelsCtx.beginPath();
+    labelsCtx.arc(x, y, 2.5, 0, Math.PI * 2);
+    labelsCtx.fillStyle = '#ff4800';
+    labelsCtx.fill();
+
+    labelsCtx.beginPath();
+    labelsCtx.moveTo(x, y);
+    labelsCtx.lineTo(labelX + (screenPos.x > 0 ? 0 : 80), labelY);
+    labelsCtx.stroke();
+    labelsCtx.setLineDash([]);
+  });
+}
+
+// Telemetry & UI update
+function updateTelemetryUI(time) {
+  // Runtime string
+  const totalSecs = Math.floor(elapsedSimTime);
+  const hrs = String(Math.floor(totalSecs / 3600)).padStart(2, '0');
+  const mins = String(Math.floor((totalSecs % 3600) / 60)).padStart(2, '0');
+  const secs = String(totalSecs % 60).padStart(2, '0');
+  document.getElementById('val-runtime').textContent = `${hrs}:${mins}:${secs}`;
+  document.getElementById('timeline-time').textContent = `${mins}:${secs} / 00:25`;
+
+  // Gimbal needle & horizon
+  const pitchAngle = Math.sin(time * 0.8) * 3;
+  const rollAngle = Math.cos(time * 0.6) * 2;
+  const gimbalLine = document.getElementById('gimbal-line');
+  gimbalLine.style.transform = `translateY(${pitchAngle * 1.5}px) rotate(${rollAngle}deg)`;
+  document.getElementById('val-pitch').textContent = `${pitchAngle >= 0 ? '+' : ''}${pitchAngle.toFixed(2)}°`;
+  document.getElementById('val-roll').textContent = `${rollAngle >= 0 ? '+' : ''}${rollAngle.toFixed(2)}°`;
+
+  // Pressure & Thrust
+  const kpa = (16 + Math.sin(time * 2) * 5 + (currentAssembly === 'mantle' ? 8 : 0)).toFixed(0);
+  document.getElementById('val-kpa').textContent = kpa;
+  document.getElementById('val-draw').textContent = `${(16.1 + Math.sin(time) * 4.9).toFixed(1)} W`;
+
+  // Arm curl progress bars
+  armData.forEach(item => {
+    const isDetached = (currentAssembly === 'arm-r2' && item.id === 'R2');
+    const valEl = document.getElementById(`servo-val-${item.id}`);
+    const fillEl = document.getElementById(`servo-fill-${item.id}`);
+
+    if (isDetached) {
+      valEl.textContent = 'DETACHED';
+      valEl.className = 'servo-val detached';
+      fillEl.style.width = '0%';
+    } else {
+      const dynamicVal = Math.min(100, Math.max(20, Math.round(item.val + Math.sin(time * 1.5 + item.val) * 8)));
+      valEl.textContent = `${dynamicVal}%`;
+      valEl.className = 'servo-val';
+      fillEl.style.width = `${dynamicVal}%`;
+    }
+  });
+}
+
+// Start animation loop
+animate();
